@@ -1,0 +1,200 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html.dark {
+    color-scheme: dark;
+
+    --cc-bg-deep-rgb: 5 7 13;
+    --cc-bg-mid-rgb: 7 10 18;
+    --cc-bg-soft-rgb: 11 16 32;
+    --cc-bg-glass-rgb: 12 18 32;
+    --cc-text-main-rgb: 230 241 255;
+    --cc-text-soft-rgb: 138 155 184;
+    --cc-text-muted-rgb: 83 97 121;
+    --cc-cyan-rgb: 0 217 255;
+    --cc-neon-rgb: 53 255 182;
+    --cc-cyan-100-rgb: 181 242 255;
+    --cc-cyan-200-rgb: 124 231 255;
+    --cc-cyan-300-rgb: 51 220 255;
+    --cc-neon-100-rgb: 184 255 224;
+    --cc-neon-200-rgb: 125 255 204;
+    --cc-cyan: #00d9ff;
+    --cc-neon: #35ffb6;
+    --cc-border-glow: rgba(0, 217, 255, 0.18);
+    --cc-border-subtle: rgb(138 155 184 / 0.24);
+    --cc-border-card: rgb(var(--cc-cyan-rgb) / 0.14);
+    --cc-border-pill: rgb(var(--cc-cyan-rgb) / 0.18);
+    --cc-border-pill-neon: rgb(var(--cc-neon-rgb) / 0.18);
+    --cc-border-pill-amber: rgb(255 176 32 / 0.22);
+    --cc-border-pill-danger: rgb(255 77 109 / 0.22);
+    --cc-border-accent: rgb(var(--cc-cyan-rgb) / 0.22);
+    --cc-border-accent-strong: rgb(var(--cc-cyan-rgb) / 0.32);
+    --cc-glass-highlight: rgb(255 255 255 / 0.08);
+    --cc-shadow-glass: 0 0 24px rgba(0, 217, 255, 0.06);
+    --cc-shadow-glass-lg: 0 8px 48px rgba(0, 0, 0, 0.45), 0 0 24px rgba(0, 217, 255, 0.06);
+    --cc-shadow-cockpit: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 0 24px rgba(0, 217, 255, 0.05);
+    --cc-bg-cockpit: radial-gradient(circle at top right, rgba(0, 180, 255, 0.12), transparent 35%),
+      radial-gradient(circle at bottom left, rgba(0, 255, 180, 0.08), transparent 30%);
+    --cc-bg-card-glass: linear-gradient(180deg, rgba(12, 18, 32, 0.78), rgba(7, 10, 18, 0.78));
+    --cc-body-bg: #05070d;
+    --cc-body-gradient-1: rgba(0, 180, 255, 0.12);
+    --cc-body-gradient-2: rgba(0, 255, 180, 0.08);
+    --cc-ambient-1: rgba(0, 217, 255, 0.06);
+    --cc-ambient-2: rgba(53, 255, 182, 0.05);
+    --cc-scrollbar-track: rgba(255, 255, 255, 0.02);
+    --cc-scrollbar-thumb: rgba(0, 217, 255, 0.18);
+    --cc-scrollbar-thumb-hover: rgba(0, 217, 255, 0.3);
+    --cc-hover-surface: rgba(255, 255, 255, 0.05);
+  }
+
+  html.light {
+    color-scheme: light;
+
+    --cc-bg-deep-rgb: 244 247 251;
+    --cc-bg-mid-rgb: 238 242 248;
+    --cc-bg-soft-rgb: 228 234 243;
+    --cc-bg-glass-rgb: 255 255 255;
+    --cc-text-main-rgb: 26 35 50;
+    --cc-text-soft-rgb: 74 90 114;
+    --cc-text-muted-rgb: 122 138 158;
+    --cc-cyan-rgb: 0 145 171;
+    --cc-neon-rgb: 15 191 130;
+    --cc-cyan-100-rgb: 0 91 110;
+    --cc-cyan-200-rgb: 0 110 130;
+    --cc-cyan-300-rgb: 0 135 160;
+    --cc-neon-100-rgb: 11 130 90;
+    --cc-neon-200-rgb: 15 165 115;
+    --cc-cyan: #0091ab;
+    --cc-neon: #0fbf82;
+    --cc-border-glow: rgba(0, 145, 171, 0.22);
+    --cc-border-subtle: rgb(74 90 114 / 0.32);
+    --cc-border-card: rgb(var(--cc-cyan-rgb) / 0.28);
+    --cc-border-pill: rgb(var(--cc-cyan-rgb) / 0.34);
+    --cc-border-pill-neon: rgb(var(--cc-neon-rgb) / 0.34);
+    --cc-border-pill-amber: rgb(217 138 0 / 0.38);
+    --cc-border-pill-danger: rgb(217 59 88 / 0.34);
+    --cc-border-accent: rgb(var(--cc-cyan-rgb) / 0.38);
+    --cc-border-accent-strong: rgb(var(--cc-cyan-rgb) / 0.48);
+    --cc-glass-highlight: rgb(26 35 50 / 0.06);
+    --cc-shadow-glass: 0 0 24px rgba(0, 145, 171, 0.08);
+    --cc-shadow-glass-lg: 0 8px 48px rgba(26, 35, 50, 0.08), 0 0 24px rgba(0, 145, 171, 0.06);
+    --cc-shadow-cockpit: inset 0 1px 0 rgba(255, 255, 255, 0.8), 0 0 24px rgba(0, 145, 171, 0.06);
+    --cc-bg-cockpit: radial-gradient(circle at top right, rgba(0, 145, 171, 0.1), transparent 35%),
+      radial-gradient(circle at bottom left, rgba(15, 191, 130, 0.08), transparent 30%);
+    --cc-bg-card-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 251, 0.92));
+    --cc-body-bg: #f4f7fb;
+    --cc-body-gradient-1: rgba(0, 145, 171, 0.1);
+    --cc-body-gradient-2: rgba(15, 191, 130, 0.08);
+    --cc-ambient-1: rgba(0, 145, 171, 0.05);
+    --cc-ambient-2: rgba(15, 191, 130, 0.04);
+    --cc-scrollbar-track: rgba(26, 35, 50, 0.04);
+    --cc-scrollbar-thumb: rgba(0, 145, 171, 0.25);
+    --cc-scrollbar-thumb-hover: rgba(0, 145, 171, 0.4);
+    --cc-hover-surface: rgba(26, 35, 50, 0.06);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--cc-border-subtle);
+  }
+
+  body {
+    @apply bg-bg-deep text-text-main font-sans antialiased;
+    background-image: radial-gradient(
+        circle at top right,
+        var(--cc-body-gradient-1),
+        transparent 35%
+      ),
+      radial-gradient(circle at bottom left, var(--cc-body-gradient-2), transparent 30%);
+    background-attachment: fixed;
+    background-color: var(--cc-body-bg);
+    position: relative;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(circle at 80% 20%, var(--cc-ambient-1), transparent 40%),
+      radial-gradient(circle at 15% 85%, var(--cc-ambient-2), transparent 35%);
+    animation: ambientDrift 18s ease-in-out infinite alternate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body::before {
+      animation: none;
+      opacity: 0.6;
+    }
+  }
+
+  ::selection {
+    background-color: rgb(var(--cc-cyan-rgb) / 0.3);
+    color: rgb(var(--cc-text-main-rgb));
+  }
+
+  *:focus-visible {
+    outline: 2px solid rgb(var(--cc-cyan-rgb));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--cc-scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--cc-scrollbar-thumb);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--cc-scrollbar-thumb-hover);
+  }
+}
+
+@layer components {
+  .glass-card-shine::before {
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--cc-glass-highlight),
+      transparent
+    );
+  }
+
+  .fts-snippet mark {
+    border-radius: 0.125rem;
+    background-color: rgb(var(--cc-cyan-rgb) / 0.2);
+    padding-left: 0.125rem;
+    padding-right: 0.125rem;
+    color: rgb(var(--cc-cyan-200-rgb));
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@keyframes ambientDrift {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 0.85;
+  }
+}
