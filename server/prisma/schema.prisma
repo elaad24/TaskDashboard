@@ -1,0 +1,465 @@
+// Command Center Prisma schema (SQLite)
+//
+// Notes:
+// - SQLite has no native enum/array types; we store enums as strings and
+//   array-like fields as JSON strings.
+// - FTS5 virtual tables are added via a follow-up raw SQL migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Areas + Tracks
+// -----------------------------------------------------------------------------
+
+model Area {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String?
+  icon        String?
+  status      String   @default("active") // active | paused | archived
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tracks      Track[]
+  goals       Goal[]
+  tasks       Task[]
+  problems    Problem[]
+  logs        Log[]
+  studyTopics StudyTopic[]
+  resources   Resource[]
+  trackedTags TrackedTag[]
+}
+
+model Track {
+  id          String   @id @default(cuid())
+  areaId      String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  area        Area     @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  goals       Goal[]
+  tasks       Task[]
+  problems    Problem[]
+  logs        Log[]
+  studyTopics StudyTopic[]
+  resources   Resource[]
+
+  @@unique([areaId, name])
+}
+
+// -----------------------------------------------------------------------------
+// Goals
+// -----------------------------------------------------------------------------
+
+model Goal {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  areaId      String?
+  trackId     String?
+  status      String   @default("active")   // active | paused | done | archived
+  priority    String   @default("medium")   // low | medium | high | critical
+  sortOrder   Int      @default(0)
+  progress    Float    @default(0)          // 0-100
+  targetDate  DateTime?
+  nextAction  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  completedAt DateTime?
+
+  area      Area?      @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  track     Track?     @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  tasks     Task[]
+  problems  Problem[]
+  logs      Log[]
+  studyTopics StudyTopic[]
+  resources Resource[]
+
+  @@index([status])
+  @@index([areaId])
+}
+
+// -----------------------------------------------------------------------------
+// Tasks
+// -----------------------------------------------------------------------------
+
+model Task {
+  id               String   @id @default(cuid())
+  title            String
+  description      String?
+  status           String   @default("todo")   // todo | in_progress | blocked | done | cancelled
+  priority         String   @default("medium") // low | medium | high | critical
+  sortOrder        Int      @default(0)
+  priorityScore    Float    @default(0)
+  importance       Int      @default(3)        // 1..5
+  urgency          Int      @default(3)        // 1..5
+  effort           Int      @default(3)        // 1..5
+  areaId           String?
+  trackId          String?
+  goalId           String?
+  problemId        String?
+  dueDate          DateTime?
+  estimatedMinutes Int?
+  actualMinutes    Int?
+  costAmount       Float?
+  costCurrency     String?
+  source           String   @default("manual") // manual | ai
+  reason           String?
+  recurrenceId     String?
+  isRecurringTemplate Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  completedAt      DateTime?
+
+  area    Area?    @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  track   Track?   @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  goal    Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  problem Problem? @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  recurrence TaskRecurrence? @relation("RecurrenceInstances", fields: [recurrenceId], references: [id], onDelete: SetNull)
+  recurrenceTemplate TaskRecurrence? @relation("TemplateTask")
+  logs    Log[]
+  reminders Reminder[]
+  blockedBy TaskDependency[] @relation("TaskBlocks")
+  dependsOn TaskDependency[] @relation("TaskDependsOn")
+
+  @@index([status])
+  @@index([priorityScore])
+  @@index([areaId])
+  @@index([goalId])
+  @@index([dueDate])
+  @@index([recurrenceId])
+}
+
+model TaskDependency {
+  id          String   @id @default(cuid())
+  taskId      String
+  dependsOnId String
+  createdAt   DateTime @default(now())
+
+  task      Task @relation("TaskBlocks", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn Task @relation("TaskDependsOn", fields: [dependsOnId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, dependsOnId])
+  @@index([taskId])
+  @@index([dependsOnId])
+}
+
+// -----------------------------------------------------------------------------
+// Problems / Blockers
+// -----------------------------------------------------------------------------
+
+model Problem {
+  id               String   @id @default(cuid())
+  title            String
+  description      String?
+  areaId           String?
+  trackId          String?
+  goalId           String?
+  status           String   @default("open")   // open | planning | resolved
+  priority         String   @default("medium")
+  aiInterpretation String?
+  suggestedPlan    String?  // JSON string of plan steps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  resolvedAt       DateTime?
+
+  area  Area?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  track Track? @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  goal  Goal?  @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  tasks Task[]
+  logs  Log[]
+
+  @@index([status])
+  @@index([areaId])
+}
+
+// -----------------------------------------------------------------------------
+// Logs / History
+// -----------------------------------------------------------------------------
+
+model Log {
+  id               String   @id @default(cuid())
+  title            String
+  content          String?
+  kind             String   @default("note") // completion | expense | study | note | decision
+  areaId           String?
+  trackId          String?
+  goalId           String?
+  taskId           String?
+  problemId        String?
+  studyTopicId     String?
+  timeSpentMinutes Int?
+  costAmount       Float?
+  costCurrency     String?
+  occurredAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  area        Area?       @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  track       Track?      @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  goal        Goal?       @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  task        Task?       @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  problem     Problem?    @relation(fields: [problemId], references: [id], onDelete: SetNull)
+  studyTopic  StudyTopic? @relation(fields: [studyTopicId], references: [id], onDelete: SetNull)
+
+  @@index([kind])
+  @@index([occurredAt])
+  @@index([areaId])
+}
+
+// -----------------------------------------------------------------------------
+// Study Topics
+// -----------------------------------------------------------------------------
+
+model StudyTopic {
+  id            String   @id @default(cuid())
+  subject       String
+  topic         String
+  confidence    String   @default("medium") // low | medium | high
+  mockScore     Int?
+  weakTopics    String   @default("[]")     // JSON array of strings
+  totalMinutes  Int      @default(0)
+  areaId        String?
+  trackId       String?
+  goalId        String?
+  notes         String?
+  lastStudiedAt DateTime?
+  nextReviewAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  area  Area?  @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  track Track? @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  goal  Goal?  @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  logs  Log[]
+  resources Resource[]
+
+  @@index([subject])
+  @@index([areaId])
+}
+
+// -----------------------------------------------------------------------------
+// Resources (links / notes / files attached to areas / goals / topics)
+// -----------------------------------------------------------------------------
+
+model Resource {
+  id           String   @id @default(cuid())
+  title        String
+  url          String?
+  type         String   @default("link") // link | note | file
+  content      String?
+  areaId       String?
+  trackId      String?
+  goalId       String?
+  studyTopicId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  area       Area?       @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  track      Track?      @relation(fields: [trackId], references: [id], onDelete: SetNull)
+  goal       Goal?       @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  studyTopic StudyTopic? @relation(fields: [studyTopicId], references: [id], onDelete: SetNull)
+}
+
+// -----------------------------------------------------------------------------
+// AI Threads (history of command-bar conversations)
+// -----------------------------------------------------------------------------
+
+model AIThread {
+  id        String   @id @default(cuid())
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages AIMessage[]
+}
+
+model AIMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  role      String   // user | assistant | system
+  content   String
+  payload   String?  // optional JSON string for parsed structured output
+  tokensIn  Int?
+  tokensOut Int?
+  createdAt DateTime @default(now())
+
+  thread AIThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model TaskRecurrence {
+  id                String   @id @default(cuid())
+  taskId            String   @unique
+  frequency         String   // daily | weekly | monthly | interval
+  intervalDays      Int?
+  weekdays          String?  // JSON array [0..6]
+  monthDay          Int?
+  timeOfDay         String   // HH:mm
+  timezone          String   @default("UTC")
+  startsOn          DateTime
+  endsOn            DateTime?
+  lastMaterializedAt DateTime?
+  isActive          Boolean  @default(true)
+  autoCreateCalendarEvent Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  task      Task     @relation("TemplateTask", fields: [taskId], references: [id], onDelete: Cascade)
+  instances Task[]   @relation("RecurrenceInstances")
+}
+
+model Reminder {
+  id           String   @id @default(cuid())
+  kind         String   // one_off | task_due | recurring | daily_digest | custom
+  targetType   String?  // task | goal | problem
+  targetId     String?
+  taskId       String?
+  title        String
+  body         String?
+  scheduledFor DateTime
+  timezone     String   @default("UTC")
+  status       String   @default("pending") // pending | sent | failed | cancelled | snoozed
+  sentAt       DateTime?
+  snoozedUntil DateTime?
+  attempt      Int      @default(0)
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([scheduledFor, status])
+}
+
+model TelegramSubscriber {
+  id              String   @id @default(cuid())
+  chatId          String?  @unique
+  username        String?
+  pairedAt        DateTime @default(now())
+  pairingCode     String?
+  pairingExpiresAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// Google integrations (Gmail + Calendar) — tokens stored locally; protect DB file.
+// -----------------------------------------------------------------------------
+
+model IntegrationToken {
+  id                 String    @id @default(cuid())
+  provider           String    @unique // google
+  refreshToken       String
+  accessToken        String?
+  expiresAt          DateTime?
+  scopes             String    // JSON array
+  gmailLastSyncAt    DateTime?
+  calendarLastSyncAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+model IntegrationScan {
+  id              String   @id @default(cuid())
+  provider        String
+  externalId      String
+  etag            String?
+  kind            String   // email | event | event_write
+  processedAt     DateTime @default(now())
+  outcome         String?
+  capturesCreated Int      @default(0)
+
+  @@unique([provider, externalId])
+  @@index([provider, kind])
+}
+
+model TrackedTag {
+  id             String   @id @default(cuid())
+  name           String
+  aliases        String   @default("[]") // JSON string[]
+  areaId         String?
+  askFields      String   @default("{}") // JSON { cost?, duration?, location?, counterparty? }
+  defaultLogKind String   @default("note") // expense | study | note
+  autoLog        Boolean  @default(false)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  area            Area?            @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  pendingCaptures PendingCapture[]
+
+  @@index([active])
+}
+
+model PendingCapture {
+  id               String    @id @default(cuid())
+  source           String    // email | calendar | manual
+  sourceRef        String
+  trackedTagId     String?
+  title            String
+  snippet          String?
+  occurredAt       DateTime?
+  suggestedAreaId  String?
+  askFields        String    @default("{}")
+  status           String    @default("pending") // pending | answered | dismissed
+  snoozedUntil     DateTime?
+  createdAt        DateTime  @default(now())
+  answeredAt       DateTime?
+
+  trackedTag TrackedTag? @relation(fields: [trackedTagId], references: [id], onDelete: SetNull)
+
+  @@index([status, snoozedUntil])
+  @@index([sourceRef])
+}
+
+// -----------------------------------------------------------------------------
+// Sidebar feed (motivation / learning ticker)
+// -----------------------------------------------------------------------------
+
+model FeedGroup {
+  id        String     @id @default(cuid())
+  name      String
+  parentId  String?
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  parent   FeedGroup?  @relation("FeedGroupTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children FeedGroup[] @relation("FeedGroupTree")
+  items    FeedItem[]
+
+  @@index([parentId])
+}
+
+model FeedItem {
+  id                   String   @id @default(cuid())
+  groupId              String
+  content              String
+  excludedFromRotation Boolean  @default(false)
+  sortOrder            Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  group FeedGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+}
