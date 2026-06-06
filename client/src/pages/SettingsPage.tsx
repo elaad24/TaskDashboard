@@ -23,7 +23,7 @@ export const SettingsPage = () => {
 
   const [aiProvider, setAiProvider] = useState<'openai' | 'ollama'>('openai');
   const [openaiModel, setOpenaiModel] = useState('gpt-4o-mini');
-  const [ollamaModel, setOllamaModel] = useState('llama3.1');
+  const [ollamaModel, setOllamaModel] = useState('gemma3');
   const [ollamaBaseUrl, setOllamaBaseUrl] = useState('http://localhost:11434');
   const [telegramEnabled, setTelegramEnabled] = useState(false);
   const [telegramBotToken, setTelegramBotToken] = useState('');

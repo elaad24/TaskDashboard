@@ -104,7 +104,7 @@ from its own `.env` (defaults to `http://localhost:4000`).
 | `OPENAI_API_KEY`    | Yes*     | -                        | Navigator AI (*required unless using Ollama only) |
 | `OPENAI_MODEL`      | No       | `gpt-4o-mini`            | OpenAI model default              |
 | `OLLAMA_BASE_URL`   | No       | `http://localhost:11434` | Ollama host (optional)            |
-| `OLLAMA_MODEL`      | No       | `llama3.1`               | Ollama model default              |
+| `OLLAMA_MODEL`      | No       | `gemma3`                 | Ollama model default (Google Gemma) |
 | `DATABASE_URL`      | Yes      | `file:./dev.db`          | SQLite path (resolved relative to `server/prisma/schema.prisma`, i.e. `server/prisma/dev.db`) |
 | `PORT`              | No       | `4000`                   | API port                          |
 | `NODE_ENV`          | No       | `development`            | `development` or `production`     |

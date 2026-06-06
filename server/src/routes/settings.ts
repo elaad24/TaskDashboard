@@ -87,7 +87,7 @@ settingsRouter.post(
             baseUrl: input.ollamaBaseUrl ?? settings.ai.ollamaBaseUrl,
           })
         : createOpenAiProvider({
-            apiKey: env.OPENAI_API_KEY,
+            apiKey: env.OPENAI_API_KEY ?? '',
             model: input.openaiModel ?? settings.ai.openaiModel,
           });
     const result = await provider.ping();
