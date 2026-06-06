@@ -6,7 +6,11 @@ export const useSettings = () =>
   useQuery({ queryKey: queryKeys.settings, queryFn: () => apiSettings.get() });
 
 export const useSettingsStatus = () =>
-  useQuery({ queryKey: ['settings-status'], queryFn: () => apiSettings.status() });
+  useQuery({
+    queryKey: ['settings-status'],
+    queryFn: () => apiSettings.status(),
+    refetchInterval: 60_000,
+  });
 
 export const useUpdateSettings = () => {
   const queryClient = useQueryClient();
