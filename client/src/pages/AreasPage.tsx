@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Layers, Plus } from 'lucide-react';
+import type { Task } from '@command-center/shared';
 import { useSearchParams } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { PageScroll } from '@/components/layout/PageScroll';
@@ -8,6 +9,8 @@ import { GlowButton } from '@/components/ui/GlowButton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EditTaskModal } from '@/components/ui/EditTaskModal';
+import { TaskActionsMenu } from '@/components/ui/TaskActionsMenu';
 import { useAreas, useCreateArea } from '@/hooks/useAreas';
 import { useTasks } from '@/hooks/useTasks';
 import { useGoals } from '@/hooks/useGoals';
@@ -20,6 +23,7 @@ export const AreasPage = () => {
   const selectedId = params.get('selected') ?? areas?.[0]?.id ?? null;
   const create = useCreateArea();
   const [newName, setNewName] = useState('');
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   const tasks = useTasks(selectedId ? { areaId: selectedId, filter: 'open' } : undefined);
   const goals = useGoals(selectedId ? { areaId: selectedId, status: 'active' } : undefined);
@@ -181,13 +185,24 @@ export const AreasPage = () => {
                 ) : (
                   <ul className="mt-3 space-y-1.5">
                     {tasks.data!.slice(0, 8).map((t) => (
-                      <li key={t.id} className="flex items-center justify-between text-sm">
-                        <span className="text-text-main">{t.title}</span>
-                        <StatusBadge tone="muted">{t.priority}</StatusBadge>
+                      <li
+                        key={t.id}
+                        className="group flex items-center justify-between gap-2 rounded-md px-1 py-1 text-sm transition-colors hover:bg-white/[0.02]"
+                      >
+                        <span className="min-w-0 flex-1 truncate text-text-main">{t.title}</span>
+                        <div className="flex flex-shrink-0 items-center gap-1.5">
+                          <TaskActionsMenu
+                            task={t}
+                            onEdit={setEditingTask}
+                            className="opacity-0 group-hover:opacity-100"
+                          />
+                          <StatusBadge tone="muted">{t.priority}</StatusBadge>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
+                <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} />
               </GlassCard>
 
               <GlassCard className="p-5">

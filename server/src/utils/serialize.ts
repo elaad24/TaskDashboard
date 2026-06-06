@@ -12,6 +12,7 @@ import type {
 } from '@prisma/client';
 import type {
   Area,
+  DashboardLog,
   Goal,
   Log,
   Problem,
@@ -128,6 +129,18 @@ export const serializeLog = (l: PLog): Log => ({
   costCurrency: l.costCurrency,
   occurredAt: isoRequired(l.occurredAt),
   createdAt: isoRequired(l.createdAt),
+});
+
+type LogWithRelations = PLog & {
+  task?: PTask | null;
+  area?: { name: string } | null;
+};
+
+export const serializeDashboardLog = (l: LogWithRelations): DashboardLog => ({
+  ...serializeLog(l),
+  taskTitle: l.task?.title ?? null,
+  task: l.task ? serializeTask(l.task) : null,
+  areaName: l.area?.name ?? null,
 });
 
 export const serializeStudyTopic = (s: PStudyTopic): StudyTopic => {

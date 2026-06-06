@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertOctagon, Sparkles } from 'lucide-react';
+import { AlertOctagon, Sparkles, MoreHorizontal } from 'lucide-react';
 import type { Problem, SolveProblemResponse } from '@command-center/shared';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlowButton } from '@/components/ui/GlowButton';
@@ -7,6 +7,7 @@ import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EditProblemModal } from '@/components/ui/EditProblemModal';
 import { useSolveProblem } from '@/hooks/useNavigator';
 import { useCreateTask } from '@/hooks/useTasks';
 
@@ -17,6 +18,7 @@ type ProblemsCardProps = {
 
 export const ProblemsCard = ({ problems, loading }: ProblemsCardProps) => {
   const [openId, setOpenId] = useState<string | null>(null);
+  const [editingProblem, setEditingProblem] = useState<Problem | null>(null);
   const [aiResult, setAiResult] = useState<Record<string, SolveProblemResponse>>({});
   const solveMutation = useSolveProblem();
   const createTask = useCreateTask();
@@ -72,7 +74,7 @@ export const ProblemsCard = ({ problems, loading }: ProblemsCardProps) => {
             const aiData = aiResult[p.id];
             return (
               <li key={p.id}>
-                <div className="rounded-lg border border-amber/30 bg-amber/[0.04] p-3">
+                <div className="group rounded-lg border border-amber/30 bg-amber/[0.04] p-3">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-sm font-medium text-text-main">{p.title}</div>
@@ -80,9 +82,20 @@ export const ProblemsCard = ({ problems, loading }: ProblemsCardProps) => {
                         <p className="mt-1 line-clamp-2 text-xs text-text-soft">{p.description}</p>
                       )}
                     </div>
-                    <StatusBadge tone="amber" dot>
-                      {p.status}
-                    </StatusBadge>
+                    <div className="flex flex-shrink-0 items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setEditingProblem(p)}
+                        className="flex items-center justify-center rounded-md border border-transparent p-1.5 text-text-muted opacity-0 transition-all hover:border-border-accent hover:bg-white/[0.04] hover:text-cyan group-hover:opacity-100"
+                        aria-label={`Edit ${p.title}`}
+                        data-test-id={`problem-edit-${p.id}`}
+                      >
+                        <MoreHorizontal size={14} />
+                      </button>
+                      <StatusBadge tone="amber" dot>
+                        {p.status}
+                      </StatusBadge>
+                    </div>
                   </div>
 
                   {p.aiInterpretation && !aiData && (
@@ -133,6 +146,8 @@ export const ProblemsCard = ({ problems, loading }: ProblemsCardProps) => {
           })}
         </ul>
       )}
+
+      <EditProblemModal problem={editingProblem} onClose={() => setEditingProblem(null)} />
     </GlassCard>
   );
 };

@@ -9,6 +9,7 @@ import { GlowButton } from '@/components/ui/GlowButton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useConfirmParse } from '@/hooks/useNavigator';
 import { useAreas } from '@/hooks/useAreas';
+import { hasComplexityToggleInput } from '@/lib/taskComplexityCorrections';
 
 type QuickTaskCardProps = {
   /** The current parse result — controlled by the parent (ParseResultCard). */
@@ -77,7 +78,7 @@ export const QuickTaskCard = ({
     onClose();
   };
 
-  const hasTaskLikeInput = result.items.some((i) => i.kind === 'task');
+  const hasTaskLikeInput = hasComplexityToggleInput(result.items);
 
   return (
     <motion.div

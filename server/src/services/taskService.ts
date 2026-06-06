@@ -136,6 +136,18 @@ export const createTask = async (input: CreateTaskInput) => {
       reason: input.reason ?? null,
     },
   });
+  await prisma.log.create({
+    data: {
+      title: task.title,
+      content: task.description,
+      kind: 'task_created',
+      taskId: task.id,
+      areaId: task.areaId,
+      goalId: task.goalId,
+      occurredAt: task.createdAt,
+    },
+  });
+
   if (task.dueDate) {
     const reminderAt = new Date(task.dueDate);
     reminderAt.setHours(reminderAt.getHours() - 1);

@@ -386,7 +386,8 @@ export const apiResources = {
 // ---------------------------------------------------------------------------
 
 export const apiDashboard = {
-  get: () => request('GET', '/api/dashboard', { schema: dashboardResponseSchema }),
+  get: (): Promise<DashboardResponse> =>
+    request('GET', '/api/dashboard', { schema: dashboardResponseSchema }),
 };
 
 export const apiOverview = {

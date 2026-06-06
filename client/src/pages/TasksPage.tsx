@@ -27,6 +27,8 @@ import { cn } from '@/lib/cn';
 import { formatMinutes } from '@/lib/format';
 import { useAddToCalendar } from '@/hooks/useCalendar';
 import { useToast } from '@/components/ui/Toast';
+import { EditTaskModal } from '@/components/ui/EditTaskModal';
+import { TaskActionsMenu } from '@/components/ui/TaskActionsMenu';
 
 const FILTERS: Array<{ key: TaskFilters['filter']; label: string }> = [
   { key: 'open', label: 'Open' },
@@ -145,6 +147,7 @@ export const TasksPage = () => {
   const toast = useToast();
   const [newTitle, setNewTitle] = useState('');
   const [completion, setCompletion] = useState<CompletionModalState>({ task: null });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [recurrence, setRecurrence] = useState<RecurrenceModalState>({ task: null });
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<'daily' | 'weekly' | 'monthly' | 'interval'>(
     'daily',
@@ -171,7 +174,7 @@ export const TasksPage = () => {
   };
 
   const renderTaskRow = (t: Task) => (
-    <div className="flex flex-wrap items-center gap-3 px-1 py-2 transition-colors hover:bg-white/[0.02]">
+    <div className="group flex flex-wrap items-center gap-3 px-1 py-2 transition-colors hover:bg-white/[0.02]">
       <button
         className={cn(
           'flex h-6 w-6 items-center justify-center rounded-full border transition-all',
@@ -212,6 +215,8 @@ export const TasksPage = () => {
         {t.recurrenceId && <StatusBadge tone="neon">Recurring instance</StatusBadge>}
         {t.isRecurringTemplate && <StatusBadge tone="cyan">Recurring template</StatusBadge>}
       </div>
+
+      <TaskActionsMenu task={t} onEdit={setEditingTask} />
 
       {t.status !== 'done' && (
         <div className="flex items-center gap-2">
@@ -379,6 +384,8 @@ export const TasksPage = () => {
       {completion.task && (
         <CompletionModal task={completion.task} onClose={() => setCompletion({ task: null })} />
       )}
+
+      <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} />
 
       {recurrence.task && (
         <div

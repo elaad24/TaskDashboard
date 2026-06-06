@@ -1,15 +1,63 @@
-import type { DashboardResponse, MissionBriefing } from '@command-center/shared';
+import type { DashboardLog, DashboardResponse, MissionBriefing } from '@command-center/shared';
+import type { Task as PTask } from '@prisma/client';
 import { prisma } from '../db.js';
 import {
   serializeArea,
   serializeGoal,
-  serializeLog,
+  serializeDashboardLog,
   serializeProblem,
   serializeStudyTopic,
   serializeTask,
 } from '../utils/serialize.js';
 
 const DEFAULT_CURRENCY = 'EUR';
+const RECENT_LOGS_LIMIT = 8;
+const RECENT_LOGS_FETCH_POOL = 12;
+
+type TaskWithArea = PTask & { area: { name: string } | null };
+
+/** Synthetic feed entry for tasks that exist but never got a Log row. */
+const syntheticTaskCreatedLog = (task: PTask, areaName: string | null): DashboardLog => {
+  const serialized = serializeTask(task);
+  const at = serialized.createdAt;
+  return {
+    id: `synthetic:task:${task.id}`,
+    title: task.title,
+    content: task.description,
+    kind: 'task_created',
+    areaId: task.areaId,
+    trackId: task.trackId,
+    goalId: task.goalId,
+    taskId: task.id,
+    problemId: task.problemId,
+    studyTopicId: null,
+    timeSpentMinutes: null,
+    costAmount: null,
+    costCurrency: null,
+    occurredAt: at,
+    createdAt: at,
+    taskTitle: task.title,
+    task: serialized,
+    areaName,
+  };
+};
+
+const buildMergedRecentLogs = (
+  logs: Parameters<typeof serializeDashboardLog>[0][],
+  recentTasks: Array<TaskWithArea>,
+): Array<DashboardLog> => {
+  const loggedTaskIds = new Set(
+    logs.map((l) => l.taskId).filter((id): id is string => id != null),
+  );
+
+  const synthetic = recentTasks
+    .filter((t) => !loggedTaskIds.has(t.id))
+    .map((t) => syntheticTaskCreatedLog(t, t.area?.name ?? null));
+
+  return [...logs.map(serializeDashboardLog), ...synthetic]
+    .sort((a, b) => new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime())
+    .slice(0, RECENT_LOGS_LIMIT);
+};
 
 const startOfWeek = (): Date => {
   const d = new Date();
@@ -25,31 +73,41 @@ const startOfMonth = (): Date => {
 };
 
 export const buildDashboard = async (): Promise<DashboardResponse> => {
-  const [areas, openTasks, activeGoals, openProblems, recentLogs, studyTopics] = await Promise.all([
-    prisma.area.findMany({ orderBy: { order: 'asc' } }),
-    prisma.task.findMany({
-      where: { status: { notIn: ['done', 'cancelled'] } },
-      orderBy: [{ sortOrder: 'asc' }, { priorityScore: 'desc' }, { createdAt: 'desc' }],
-      take: 50,
-    }),
-    prisma.goal.findMany({
-      where: { status: 'active' },
-      orderBy: [{ sortOrder: 'asc' }, { priority: 'desc' }, { progress: 'desc' }],
-      take: 5,
-    }),
-    prisma.problem.findMany({
-      where: { status: { in: ['open', 'planning'] } },
-      orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
-      take: 5,
-    }),
-    prisma.log.findMany({
-      orderBy: { occurredAt: 'desc' },
-      take: 8,
-    }),
-    prisma.studyTopic.findMany({
-      orderBy: [{ confidence: 'asc' }, { lastStudiedAt: 'asc' }],
-    }),
-  ]);
+  const [areas, openTasks, activeGoals, openProblems, recentLogs, studyTopics, recentTasks] =
+    await Promise.all([
+      prisma.area.findMany({ orderBy: { order: 'asc' } }),
+      prisma.task.findMany({
+        where: { status: { notIn: ['done', 'cancelled'] } },
+        orderBy: [{ sortOrder: 'asc' }, { priorityScore: 'desc' }, { createdAt: 'desc' }],
+        take: 50,
+      }),
+      prisma.goal.findMany({
+        where: { status: 'active' },
+        orderBy: [{ sortOrder: 'asc' }, { priority: 'desc' }, { progress: 'desc' }],
+        take: 5,
+      }),
+      prisma.problem.findMany({
+        where: { status: { in: ['open', 'planning'] } },
+        orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
+        take: 5,
+      }),
+      prisma.log.findMany({
+        orderBy: { occurredAt: 'desc' },
+        take: RECENT_LOGS_FETCH_POOL,
+        include: {
+          task: true,
+          area: { select: { name: true } },
+        },
+      }),
+      prisma.studyTopic.findMany({
+        orderBy: [{ confidence: 'asc' }, { lastStudiedAt: 'asc' }],
+      }),
+      prisma.task.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: RECENT_LOGS_FETCH_POOL,
+        include: { area: { select: { name: true } } },
+      }),
+    ]);
 
   const tracksWithCounts = await Promise.all(
     areas.map(async (area) => {
@@ -141,14 +199,14 @@ export const buildDashboard = async (): Promise<DashboardResponse> => {
     activeGoals: activeGoals.map(serializeGoal),
     tracks: tracksWithCounts,
     problems: openProblems.map(serializeProblem),
-    recentLogs: recentLogs.map(serializeLog),
+    recentLogs: buildMergedRecentLogs(recentLogs, recentTasks),
     budget: {
       monthSpend: monthSpendAgg._sum.costAmount ?? 0,
       weekSpend: weekSpendAgg._sum.costAmount ?? 0,
       currency: DEFAULT_CURRENCY,
       byArea: byAreaSpend.map((row) => ({
         areaId: row.areaId,
-        areaName: row.areaId ? areaMap.get(row.areaId) ?? 'Other' : 'Other',
+        areaName: row.areaId ? (areaMap.get(row.areaId) ?? 'Other') : 'Other',
         total: row._sum.costAmount ?? 0,
       })),
     },

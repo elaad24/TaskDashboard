@@ -31,6 +31,7 @@ import { useConfirmParse } from '@/hooks/useNavigator';
 import { useAreas } from '@/hooks/useAreas';
 import { ReanalyzePanel } from '@/components/command/ReanalyzePanel';
 import { TaskComplexityToggle } from '@/components/command/TaskComplexityToggle';
+import { hasComplexityToggleInput } from '@/lib/taskComplexityCorrections';
 import { cn } from '@/lib/cn';
 
 // ---------------------------------------------------------------------------
@@ -334,7 +335,7 @@ export const AIRecommendationCard = ({
     setItemEdits(new Map());
   }, [result]);
 
-  const hasTaskLikeInput = result.items.some((item) => item.kind === 'task');
+  const hasTaskLikeInput = hasComplexityToggleInput(result.items);
 
   const toggle = (i: number) => {
     setSelected((prev) => {

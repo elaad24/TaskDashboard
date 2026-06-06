@@ -46,13 +46,21 @@ export const studySnapshotSchema = z.object({
 });
 export type StudySnapshot = z.infer<typeof studySnapshotSchema>;
 
+export const dashboardLogSchema = logSchema.extend({
+  taskTitle: z.string().nullable(),
+  /** Populated when the log is linked to a task (e.g. task_created, completion). */
+  task: taskSchema.nullable().optional(),
+  areaName: z.string().nullable().optional(),
+});
+export type DashboardLog = z.infer<typeof dashboardLogSchema>;
+
 export const dashboardResponseSchema = z.object({
   briefing: missionBriefingSchema.nullable(),
   nextActions: z.array(taskSchema),
   activeGoals: z.array(goalSchema),
   tracks: z.array(dashboardAreaCardSchema),
   problems: z.array(problemSchema),
-  recentLogs: z.array(logSchema),
+  recentLogs: z.array(dashboardLogSchema),
   budget: budgetSnapshotSchema,
   study: studySnapshotSchema,
   weakStudyTopics: z.array(studyTopicSchema),

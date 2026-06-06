@@ -24,7 +24,7 @@ export type AreaStatus = z.infer<typeof areaStatusSchema>;
 export const taskSourceSchema = z.enum(['manual', 'ai']);
 export type TaskSource = z.infer<typeof taskSourceSchema>;
 
-export const logKindSchema = z.enum(['completion', 'expense', 'study', 'note', 'decision']);
+export const logKindSchema = z.enum(['completion', 'expense', 'study', 'note', 'decision', 'task_created']);
 export type LogKind = z.infer<typeof logKindSchema>;
 
 export const confidenceSchema = z.enum(['low', 'medium', 'high']);

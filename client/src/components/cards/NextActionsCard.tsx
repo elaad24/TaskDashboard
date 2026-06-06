@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ListChecks, Check } from 'lucide-react';
 import type { Task } from '@command-center/shared';
 import { SortableList } from '@/components/dnd/SortableList';
@@ -8,6 +9,8 @@ import { PriorityBadge } from '@/components/ui/PriorityBadge';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { EditTaskModal } from '@/components/ui/EditTaskModal';
+import { TaskActionsMenu } from '@/components/ui/TaskActionsMenu';
 import { useCompleteTask, useReorderTasks } from '@/hooks/useTasks';
 import { formatMinutes } from '@/lib/format';
 import { useAreas } from '@/hooks/useAreas';
@@ -18,6 +21,7 @@ type NextActionsCardProps = {
 };
 
 export const NextActionsCard = ({ tasks, loading }: NextActionsCardProps) => {
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const completeMutation = useCompleteTask();
   const reorderTasks = useReorderTasks();
   const { data: areas } = useAreas();
@@ -70,21 +74,30 @@ export const NextActionsCard = ({ tasks, loading }: NextActionsCardProps) => {
                     </p>
                   )}
                 </div>
-                <GlowButton
-                  size="sm"
-                  variant="subtle"
-                  leftIcon={<Check size={12} />}
-                  loading={completeMutation.isPending && completeMutation.variables?.id === task.id}
-                  onClick={() => completeMutation.mutate({ id: task.id, input: {} })}
-                  aria-label={`Complete ${task.title}`}
-                >
-                  Done
-                </GlowButton>
+                <div className="flex flex-shrink-0 items-center gap-1">
+                  <TaskActionsMenu
+                    task={task}
+                    onEdit={setEditingTask}
+                    className="opacity-0 group-hover:opacity-100"
+                  />
+                  <GlowButton
+                    size="sm"
+                    variant="subtle"
+                    leftIcon={<Check size={12} />}
+                    loading={completeMutation.isPending && completeMutation.variables?.id === task.id}
+                    onClick={() => completeMutation.mutate({ id: task.id, input: {} })}
+                    aria-label={`Complete ${task.title}`}
+                  >
+                    Done
+                  </GlowButton>
+                </div>
               </div>
             )}
           />
         </div>
       )}
+
+      <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} />
     </GlassCard>
   );
 };

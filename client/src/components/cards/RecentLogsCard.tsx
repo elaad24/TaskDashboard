@@ -1,5 +1,5 @@
-import { ScrollText, Wallet, BookOpen, Check, FileText, Lightbulb } from 'lucide-react';
-import type { Log } from '@command-center/shared';
+import { ScrollText, Wallet, BookOpen, Check, FileText, Lightbulb, Plus } from 'lucide-react';
+import type { DashboardLog, Log } from '@command-center/shared';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { SectionHeader } from '@/components/ui/SectionHeader';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -17,6 +17,8 @@ const kindIcon = (k: Log['kind']) => {
       return <Check size={14} />;
     case 'decision':
       return <Lightbulb size={14} />;
+    case 'task_created':
+      return <Plus size={14} />;
     case 'note':
     default:
       return <FileText size={14} />;
@@ -24,7 +26,7 @@ const kindIcon = (k: Log['kind']) => {
 };
 
 type RecentLogsCardProps = {
-  logs: Array<Log>;
+  logs: Array<DashboardLog>;
   loading?: boolean;
 };
 
@@ -42,7 +44,7 @@ export const RecentLogsCard = ({ logs, loading }: RecentLogsCardProps) => (
       <EmptyState
         className="mt-4 flex-1"
         title="No history yet."
-        description="Completed tasks and notes will appear here."
+        description="Completed tasks, added tasks, and notes will appear here."
       />
     ) : (
       <ul className="mt-4 divide-y divide-border-subtle">
@@ -53,6 +55,33 @@ export const RecentLogsCard = ({ logs, loading }: RecentLogsCardProps) => (
               <div className="flex items-center gap-2 text-sm text-text-main">
                 <span className="truncate">{log.title}</span>
               </div>
+              {log.taskTitle && log.kind !== 'completion' && log.kind !== 'task_created' && (
+                <p className="mt-0.5 truncate text-[11px] text-text-soft" data-test-id="log-task-title">
+                  for task: {log.taskTitle}
+                </p>
+              )}
+              {log.kind === 'task_created' && log.task && (
+                <div
+                  className="mt-1 space-y-1 text-[11px] text-text-soft"
+                  data-test-id="log-task-details"
+                >
+                  {log.task.description && (
+                    <p className="line-clamp-2">{log.task.description}</p>
+                  )}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {log.areaName && (
+                      <StatusBadge tone="cyan">{log.areaName}</StatusBadge>
+                    )}
+                    <StatusBadge tone={log.task.priority === 'high' || log.task.priority === 'critical' ? 'amber' : 'muted'}>
+                      {log.task.priority}
+                    </StatusBadge>
+                    <StatusBadge tone="muted">{log.task.source}</StatusBadge>
+                    {log.task.estimatedMinutes != null && (
+                      <span>{formatMinutes(log.task.estimatedMinutes)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-text-muted">
                 <span>{formatRelative(log.occurredAt)}</span>
                 {log.costAmount !== null && (
