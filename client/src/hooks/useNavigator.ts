@@ -5,7 +5,8 @@ import { queryKeys } from '@/lib/queryClient';
 
 export const useParseBrainDump = () =>
   useMutation({
-    mutationFn: (text: string) => apiAI.parse(text),
+    mutationFn: ({ text, correction }: { text: string; correction?: string }) =>
+      apiAI.parse(text, correction),
   });
 
 export const useConfirmParse = () => {

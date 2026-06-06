@@ -40,6 +40,7 @@ import {
   ingestInputSchema,
   ingestResponseSchema,
   ingestSpecSchema,
+  parseInputSchema,
   parseResponseSchema,
   problemSchema,
   recurrenceSchema,
@@ -409,8 +410,11 @@ export const apiSearch = {
 // ---------------------------------------------------------------------------
 
 export const apiAI = {
-  parse: (text: string) =>
-    request('POST', '/api/ai/parse', { body: { text }, schema: parseResponseSchema }),
+  parse: (text: string, correction?: string) =>
+    request('POST', '/api/ai/parse', {
+      body: parseInputSchema.parse({ text, correction }),
+      schema: parseResponseSchema,
+    }),
   confirm: (input: ConfirmParseInput) =>
     request('POST', '/api/ai/confirm', {
       body: confirmParseInputSchema.parse(input),
