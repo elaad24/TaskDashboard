@@ -13,6 +13,7 @@ import { idSchema, prioritySchema } from './common.js';
 
 export const parseInputSchema = z.object({
   text: z.string().min(1).max(8000),
+  correction: z.string().min(1).max(2000).optional(),
 });
 export type ParseInput = z.infer<typeof parseInputSchema>;
 
@@ -54,6 +55,7 @@ export type ParsedItem = z.infer<typeof parsedItemSchema>;
 export const parseResponseSchema = z.object({
   items: z.array(parsedItemSchema),
   navigatorMessage: z.string().max(1000).optional().nullable(),
+  isSimpleTask: z.boolean(),
 });
 export type ParseResponse = z.infer<typeof parseResponseSchema>;
 

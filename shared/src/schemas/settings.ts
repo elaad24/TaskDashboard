@@ -5,6 +5,12 @@ export const aiProviderSchema = z.enum(['openai', 'ollama']);
 export const settingsStatusSchema = z.object({
   openai: z.object({ configured: z.boolean(), model: z.string() }),
   ai: z.object({ provider: aiProviderSchema }),
+  aiHealth: z.object({
+    preferred: aiProviderSchema,
+    effective: aiProviderSchema,
+    degraded: z.boolean(),
+    reason: z.string().nullable(),
+  }),
   env: z.string(),
 });
 export type SettingsStatus = z.infer<typeof settingsStatusSchema>;
