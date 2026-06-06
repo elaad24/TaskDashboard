@@ -7,6 +7,8 @@ import { getIntegrationSettings } from './services/integrationSettingsService.js
 import { materializeUpcoming } from './services/recurrenceService.js';
 import { createEventForTask } from './integrations/google/calendarWriter.js';
 import { prisma } from './db.js';
+import { probeOpenAiRecovery } from './ai/startupCheck.js';
+import { shouldRecheckOpenai } from './ai/health.js';
 
 let intervalHandle: NodeJS.Timeout | null = null;
 let tickCount = 0;
@@ -18,6 +20,11 @@ export const startScheduler = () => {
   intervalHandle = setInterval(() => {
     tickCount += 1;
     void dispatchDueReminders();
+    if (shouldRecheckOpenai()) {
+      void probeOpenAiRecovery().catch((err) => {
+        logger.debug({ err }, 'OpenAI recovery probe failed');
+      });
+    }
     if (tickCount % 5 === 0) {
       void materializeUpcoming().then(() => void maybeAutoCreateCalendarEvents());
     }

@@ -21,6 +21,7 @@ import { aiRouter } from './routes/ai.js';
 import { searchRouter } from './routes/search.js';
 import { settingsRouter } from './routes/settings.js';
 import { getAppSettings } from './services/appSettingsService.js';
+import { getAiHealth } from './ai/health.js';
 import { overviewRouter } from './routes/overview.js';
 import { remindersRouter } from './routes/reminders.js';
 import { ingestRouter } from './routes/ingest.js';
@@ -61,16 +62,24 @@ export const buildApp = () => {
   app.get('/api/settings/status', (_req, res, next) => {
     void getAppSettings()
       .then((settings) => {
-        const model = settings.ai.provider === 'ollama' ? settings.ai.ollamaModel : settings.ai.openaiModel;
+        const aiHealth = getAiHealth();
+        const model =
+          aiHealth.effective === 'ollama' ? settings.ai.ollamaModel : settings.ai.openaiModel;
         res.json({
           openai: {
             configured:
-              settings.ai.provider === 'openai'
+              aiHealth.preferred === 'openai'
                 ? Boolean(env.OPENAI_API_KEY)
                 : Boolean(settings.ai.ollamaBaseUrl),
             model,
           },
           ai: { provider: settings.ai.provider },
+          aiHealth: {
+            preferred: aiHealth.preferred,
+            effective: aiHealth.effective,
+            degraded: aiHealth.degraded,
+            reason: aiHealth.reason,
+          },
           env: env.NODE_ENV,
         });
       })

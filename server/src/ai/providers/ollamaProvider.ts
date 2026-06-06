@@ -12,7 +12,30 @@ type ChatResponse = {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 };
 
-const postChat = async (config: OllamaProviderConfig, messages: Array<{ role: 'system' | 'user'; content: string }>) => {
+/**
+ * Strip markdown code fences that some local models add even when told not to.
+ * e.g. ```json\n{...}\n``` -> {...}
+ */
+const stripMarkdownFences = (raw: string): string => {
+  const trimmed = raw.trim();
+  const fenceMatch = /^```(?:json)?\s*\n?([\s\S]*?)\n?```\s*$/.exec(trimmed);
+  return fenceMatch?.[1]?.trim() ?? trimmed;
+};
+
+/**
+ * Extract a human-readable list of required fields from a JSON schema.
+ * Used to build a more actionable retry prompt.
+ */
+const extractRequiredFields = (schema: Record<string, unknown>): Array<string> => {
+  const required = (schema.required as Array<string> | undefined) ?? [];
+  return required;
+};
+
+const postChat = async (
+  config: OllamaProviderConfig,
+  messages: Array<{ role: 'system' | 'user'; content: string }>,
+  jsonSchema: { name: string; schema: Record<string, unknown> },
+) => {
   const res = await fetch(`${config.baseUrl}/v1/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -20,7 +43,14 @@ const postChat = async (config: OllamaProviderConfig, messages: Array<{ role: 's
       model: config.model,
       temperature: 0.4,
       messages,
-      response_format: { type: 'json_object' },
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: jsonSchema.name,
+          strict: true,
+          schema: jsonSchema.schema,
+        },
+      },
     }),
   });
 
@@ -34,31 +64,43 @@ const postChat = async (config: OllamaProviderConfig, messages: Array<{ role: 's
 export const createOllamaProvider = (config: OllamaProviderConfig): AiProvider => {
   const chatJson = async <T>(args: StructuredCallArgs<T>): Promise<T> => {
     const start = Date.now();
+    const requiredFields = extractRequiredFields(args.jsonSchema.schema);
+
     const systemInstruction = `${args.system}
 
-Return ONLY valid JSON matching this schema:
-${JSON.stringify(args.jsonSchema.schema)}`;
+You MUST return ONLY valid JSON. Do not include any text, explanation, or markdown outside the JSON object.
+The JSON must contain these required top-level fields: ${requiredFields.join(', ')}.
 
-    const execute = async (user: string) =>
-      postChat(config, [
-        { role: 'system', content: systemInstruction },
-        { role: 'user', content: user },
-      ]);
+Schema:
+${JSON.stringify(args.jsonSchema.schema, null, 2)}`;
 
     const parseContent = (payload: ChatResponse): unknown => {
-      const content = payload.choices?.[0]?.message?.content;
-      if (!content) throw new HttpError(502, 'AI_EMPTY_RESPONSE', 'Ollama returned no content');
+      const raw = payload.choices?.[0]?.message?.content;
+      if (!raw) throw new HttpError(502, 'AI_EMPTY_RESPONSE', 'Ollama returned no content');
+      const cleaned = stripMarkdownFences(raw);
       try {
-        return JSON.parse(content);
+        return JSON.parse(cleaned);
       } catch {
-        throw new HttpError(502, 'AI_INVALID_JSON', 'Ollama returned non-JSON content');
+        throw new HttpError(502, 'AI_INVALID_JSON', `Ollama returned non-JSON content: ${cleaned.slice(0, 200)}`);
       }
     };
 
+    const execute = async (user: string) =>
+      postChat(
+        config,
+        [
+          { role: 'system', content: systemInstruction },
+          { role: 'user', content: user },
+        ],
+        args.jsonSchema,
+      );
+
     try {
       const first = await execute(args.user);
+      const firstParsed = parseContent(first);
+
       try {
-        const parsed = args.parser(parseContent(first));
+        const result = args.parser(firstParsed);
         logger.debug(
           {
             provider: 'ollama',
@@ -70,15 +112,29 @@ ${JSON.stringify(args.jsonSchema.schema)}`;
           },
           'navigator provider call',
         );
-        return parsed;
+        return result;
       } catch (parseErr) {
+        const zodMessage = parseErr instanceof Error ? parseErr.message : 'invalid format';
+        logger.warn(
+          { provider: 'ollama', model: config.model, label: args.label, zodMessage },
+          'Ollama response failed schema validation — retrying with explicit correction prompt',
+        );
+
         const retryPrompt = `${args.user}
 
-Your previous output failed validation.
-Return ONLY corrected JSON. Validation issue:
-${parseErr instanceof Error ? parseErr.message : 'invalid format'}`;
+IMPORTANT: Your previous response was rejected because it was missing required fields or had wrong types.
+
+Required top-level fields (all must be present): ${requiredFields.join(', ')}
+
+Specific validation error:
+${zodMessage}
+
+Return ONLY the corrected JSON object. No markdown, no explanation.`;
+
         const second = await execute(retryPrompt);
-        const parsed = args.parser(parseContent(second));
+        const secondParsed = parseContent(second);
+        const result = args.parser(secondParsed);
+
         logger.debug(
           {
             provider: 'ollama',
@@ -91,7 +147,7 @@ ${parseErr instanceof Error ? parseErr.message : 'invalid format'}`;
           },
           'navigator provider call',
         );
-        return parsed;
+        return result;
       }
     } catch (err) {
       if (err instanceof HttpError) throw err;

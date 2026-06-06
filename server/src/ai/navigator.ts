@@ -13,7 +13,8 @@ import {
 import { prisma } from '../db.js';
 import { logger } from '../logger.js';
 import { HttpError } from '../middleware/errorHandler.js';
-import { getProvider } from './index.js';
+import { getProvider, getProviderByName } from './index.js';
+import { getAiHealth, isOpenAiFailureError, markOpenAiFailed } from './health.js';
 import {
   NAVIGATOR_SYSTEM,
   GOAL_BREAKDOWN_PROMPT,
@@ -138,10 +139,36 @@ const callStructured = async <T>(
     label: string;
   },
 ): Promise<T> => {
+  const health = getAiHealth();
+
   try {
     const provider = await getProvider();
-    return provider.chatJson(args);
+    return await provider.chatJson(args);
   } catch (err) {
+    const canFailover =
+      health.preferred === 'openai' &&
+      health.effective === 'openai' &&
+      (err instanceof HttpError ? err.code === 'AI_REQUEST_FAILED' : isOpenAiFailureError(err));
+
+    if (canFailover) {
+      const reason = err instanceof Error ? err.message : 'OpenAI request failed';
+      markOpenAiFailed(reason);
+      logger.warn({ label: args.label, reason }, 'OpenAI failed — retrying via Ollama fallback');
+
+      try {
+        const fallback = await getProviderByName('ollama');
+        return await fallback.chatJson(args);
+      } catch (fallbackErr) {
+        if (fallbackErr instanceof HttpError) throw fallbackErr;
+        logger.error({ err: fallbackErr, label: args.label }, 'Ollama fallback also failed');
+        throw new HttpError(
+          502,
+          'AI_REQUEST_FAILED',
+          `Navigator failed after Ollama fallback: ${fallbackErr instanceof Error ? fallbackErr.message : 'unknown error'}`,
+        );
+      }
+    }
+
     if (err instanceof HttpError) throw err;
     logger.error({ err, label: args.label }, 'navigator call failed');
     throw new HttpError(
@@ -156,12 +183,12 @@ const callStructured = async <T>(
 // Public API
 // ---------------------------------------------------------------------------
 
-export const parseBrainDump = async (text: string): Promise<ParseResponse> => {
+export const parseBrainDump = async (text: string, correction?: string): Promise<ParseResponse> => {
   const ctx = await buildBaseContext();
   return callStructured({
     label: 'parseBrainDump',
     system: NAVIGATOR_SYSTEM,
-    user: PARSE_PROMPT(text, ctx),
+    user: PARSE_PROMPT(text, ctx, correction),
     jsonSchema: parseResponseJsonSchema as never,
     parser: (raw) => parseResponseSchema.parse(raw),
   });
