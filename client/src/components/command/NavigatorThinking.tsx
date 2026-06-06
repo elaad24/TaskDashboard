@@ -9,14 +9,15 @@ const STAGES = [
 
 type NavigatorThinkingProps = {
   active: boolean;
+  activeText?: string;
 };
 
 /**
- * Mini-stepper that walks through the spec's three stages while the AI call
- * is in flight. We rotate stages every ~900ms; the parent decides when to
- * unmount this by toggling `active` once the response arrives.
+ * Mini-stepper that walks through the three stages while the AI call is in
+ * flight. Optionally shows a truncated label of which item is being processed
+ * so the user knows what's currently in progress.
  */
-export const NavigatorThinking = ({ active }: NavigatorThinkingProps) => {
+export const NavigatorThinking = ({ active, activeText }: NavigatorThinkingProps) => {
   const [stage, setStage] = useState(0);
 
   useEffect(() => {
@@ -32,18 +33,35 @@ export const NavigatorThinking = ({ active }: NavigatorThinkingProps) => {
 
   if (!active) return null;
 
+  const label = activeText
+    ? activeText.length > 48
+      ? `${activeText.slice(0, 48)}…`
+      : activeText
+    : null;
+
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={stage}
-        initial={{ opacity: 0, y: 4 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -4 }}
-        transition={{ duration: 0.18 }}
-        className="font-mono text-[11px] uppercase tracking-[0.18em] text-cyan-200"
-      >
-        {STAGES[stage]}
-      </motion.div>
-    </AnimatePresence>
+    <div className="flex min-w-0 items-center gap-2">
+      <AnimatePresence mode="wait">
+        <motion.span
+          key={stage}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18 }}
+          className="font-mono text-[11px] uppercase tracking-[0.18em] text-cyan-200"
+        >
+          {STAGES[stage]}
+        </motion.span>
+      </AnimatePresence>
+
+      {label && (
+        <span
+          className="max-w-[200px] truncate text-[11px] text-text-muted"
+          title={activeText}
+        >
+          "{label}"
+        </span>
+      )}
+    </div>
   );
 };

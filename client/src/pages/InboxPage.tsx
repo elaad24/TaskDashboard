@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { PageScroll } from '@/components/layout/PageScroll';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlowButton } from '@/components/ui/GlowButton';
-import { AIRecommendationCard } from '@/components/cards/AIRecommendationCard';
+import { ParseResultCard } from '@/components/command/ParseResultCard';
 import { PendingCapturesPanel } from '@/components/inbox/PendingCapturesPanel';
 import { useParseBrainDump } from '@/hooks/useNavigator';
 import { ApiError } from '@/lib/api';
@@ -27,7 +27,7 @@ export const InboxPage = () => {
     setSubmittedText(t);
     setResult(null);
     try {
-      const r = await parse.mutateAsync(t);
+      const r = await parse.mutateAsync({ text: t });
       setResult(r);
     } catch {
       // surfaced via parse.error below
@@ -91,7 +91,7 @@ export const InboxPage = () => {
               </p>
             </GlassCard>
           ) : (
-            <AIRecommendationCard
+            <ParseResultCard
               result={result}
               rawInput={submittedText}
               onClose={() => {
