@@ -9,7 +9,9 @@
     "client"
   ],
   "scripts": {
-    "dev": "npm run build -w shared && concurrently -n server,client -c cyan,magenta \"npm run dev -w server\" \"npm run dev -w client\"",
+    "start:dev": "node scripts/bootstrap-dev.mjs",
+    "predev": "npm run build -w shared && npm run prisma:generate -w server",
+    "dev": "concurrently -n shared,server,client -c yellow,cyan,magenta \"npm run dev -w shared\" \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "start": "npm run start -w server",
     "db:migrate": "npm run db:migrate -w server",
