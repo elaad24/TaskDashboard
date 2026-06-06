@@ -17,11 +17,16 @@ You operate over the user's local Command Center database (areas, tracks, goals,
 
 Always return valid JSON matching the provided schema. Never include extra prose outside the JSON.`;
 
-export const PARSE_PROMPT = (text: string, contextBlock: string) =>
+export const PARSE_PROMPT = (text: string, contextBlock: string, correction?: string) =>
   `${contextBlock}
 
 The user wrote into the command bar:
 """${text}"""
+${
+  correction
+    ? `\nUser correction (HARD OVERRIDE — follow this instruction exactly, it takes precedence over your default classification):\n"""${correction}"""\n`
+    : ''
+}
 
 Classify the input into one or more structured items.
 
@@ -36,11 +41,17 @@ Rules:
   - "study_weakness": a learning gap to address
   - "resource": a link / reference / book / video
   - "decision": a choice the user just made worth recording
-- For "task", "problem" and "study_weakness", produce 2-5 short suggestedTasks the user could do next, each with realistic estimatedMinutes.
+- For "task", "problem" and "study_weakness", produce 2-5 short suggestedTasks the user could do next, each with realistic estimatedMinutes — UNLESS isSimpleTask is true (see below).
 - Match "area" / "track" to existing ones in CONTEXT when possible. Otherwise use a sensible new name.
 - Set priority based on urgency + impact. Default to "medium" if unclear.
 - Use followUpQuestion only when you genuinely cannot proceed without more info; keep it short.
-- navigatorMessage: 1-2 short tactical sentences summarising what you classified.`;
+- navigatorMessage: 1-2 short tactical sentences summarising what you classified.
+- isSimpleTask: set true ONLY when ALL of the following are true:
+    1. The input is a single, concrete, immediately actionable task (kind must be "task").
+    2. No preparation, research, planning, or multi-step breakdown is needed.
+    3. Examples: "buy eggs", "book a flight", "call the dentist", "pay the electricity bill", "throw out the trash".
+  Set isSimpleTask: false for study topics, goals, problems, expenses, notes, decisions, resources, projects, or anything that needs splitting into steps.
+  When isSimpleTask is true: return exactly one item in items, leave suggestedTasks as an empty array ([]), and keep the title short and direct.`;
 
 export const NEXT_ACTION_PROMPT = (contextBlock: string, availableMinutes?: number) =>
   `${contextBlock}

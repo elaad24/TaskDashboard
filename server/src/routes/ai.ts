@@ -32,7 +32,9 @@ aiRouter.use(aiLimiter);
 aiRouter.post(
   '/parse',
   validate(parseInputSchema),
-  asyncHandler(async (req, res) => res.json(await parseBrainDump(req.body.text))),
+  asyncHandler(async (req, res) =>
+    res.json(await parseBrainDump(req.body.text, req.body.correction)),
+  ),
 );
 
 aiRouter.post(

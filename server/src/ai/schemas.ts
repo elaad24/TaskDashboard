@@ -17,6 +17,7 @@ export const parseResponseJsonSchema = {
     additionalProperties: false,
     properties: {
       navigatorMessage: { type: ['string', 'null'] },
+      isSimpleTask: { type: 'boolean' },
       items: {
         type: 'array',
         items: {
@@ -81,7 +82,7 @@ export const parseResponseJsonSchema = {
         },
       },
     },
-    required: ['navigatorMessage', 'items'],
+    required: ['navigatorMessage', 'isSimpleTask', 'items'],
   },
 } as const;
 
