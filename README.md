@@ -11,6 +11,8 @@ that show up on a futuristic mission-control dashboard.
 The app is fully **local-first**: a single SQLite file, no Docker, no cloud DB.
 AI can run via OpenAI or a local Ollama model, and reminders can optionally flow through Telegram.
 
+**Security note:** The API binds to `127.0.0.1` only and is intended for single-user local use. Do not expose it via `0.0.0.0`, tunnels, or deployment without adding authentication first.
+
 ---
 
 ## Tech stack

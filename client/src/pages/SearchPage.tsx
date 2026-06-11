@@ -141,7 +141,7 @@ export const SearchPage = () => {
                 />
               ) : (
                 <ul className="divide-y divide-border-subtle">
-                  {data!.hits.map((hit) => (
+                  {(data?.hits ?? []).map((hit) => (
                     <li key={`${hit.type}-${hit.id}`} className="flex items-start gap-3 py-2.5">
                       <StatusBadge tone="cyan" className="mt-0.5 shrink-0">
                         {typeLabel[hit.type]}

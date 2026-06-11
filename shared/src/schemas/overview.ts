@@ -58,6 +58,11 @@ export const overviewResponseSchema = z.object({
 });
 export type OverviewResponse = z.infer<typeof overviewResponseSchema>;
 
+export const overviewBriefingInputSchema = z.object({
+  snapshot: overviewResponseSchema,
+});
+export type OverviewBriefingInput = z.infer<typeof overviewBriefingInputSchema>;
+
 export const overviewBriefingResponseSchema = z.object({
   headline: z.string().min(1).max(300),
   bullets: z.array(z.string().min(1).max(500)).min(3).max(5),

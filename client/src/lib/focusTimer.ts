@@ -2,6 +2,8 @@ import type { FocusActivityType } from '@command-center/shared';
 
 const STORAGE_KEY = 'cc:focus:activeSession';
 
+export const FOCUS_SESSION_STORAGE_KEY = STORAGE_KEY;
+
 export type ActiveFocusSession = {
   startedAt: string;
 };

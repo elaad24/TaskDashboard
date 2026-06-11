@@ -1,30 +1,15 @@
 import type { UrgencyMetric, UrgencyResponse, UrgencyStatus } from '@command-center/shared';
 import { prisma } from '../db.js';
+import { effectiveSpendEur } from './currencyService.js';
+import { daysAgoLocal, startOfLocalDay, startOfWeek, toLocalIsoDay } from '../utils/dates.js';
 
 const DEFAULT_CURRENCY = 'EUR';
 const BEHIND_THRESHOLD = -20;
 const CRITICAL_THRESHOLD = -50;
 const AHEAD_THRESHOLD = 20;
 
-const startOfDay = (date: Date): Date => {
-  const out = new Date(date);
-  out.setHours(0, 0, 0, 0);
-  return out;
-};
-
-const daysAgo = (days: number): Date => {
-  const out = startOfDay(new Date());
-  out.setDate(out.getDate() - days);
-  return out;
-};
-
-const startOfWeek = (): Date => {
-  const d = startOfDay(new Date());
-  d.setDate(d.getDate() - d.getDay());
-  return d;
-};
-
-const toIsoDay = (date: Date): string => startOfDay(date).toISOString().slice(0, 10);
+const daysAgo = daysAgoLocal;
+const toIsoDay = toLocalIsoDay;
 
 const classifyDelta = (deltaPct: number, invert = false): UrgencyStatus => {
   const pct = invert ? -deltaPct : deltaPct;
@@ -73,7 +58,7 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
   const [
     tasksCompletedThisWeek,
     studyMinutesAgg,
-    spendWeekAgg,
+    spendLogsWeek,
     overdueTasks,
     completions14d,
     studyLogs14d,
@@ -89,9 +74,9 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
       where: { kind: 'study', occurredAt: { gte: weekStart } },
       _sum: { timeSpentMinutes: true },
     }),
-    prisma.log.aggregate({
+    prisma.log.findMany({
       where: { occurredAt: { gte: weekStart }, costAmount: { not: null } },
-      _sum: { costAmount: true },
+      select: { costAmount: true, costAmountEur: true, costCurrency: true },
     }),
     prisma.task.count({
       where: {
@@ -110,7 +95,12 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
     }),
     prisma.log.findMany({
       where: { occurredAt: { gte: horizon14 }, costAmount: { not: null } },
-      select: { occurredAt: true, costAmount: true },
+      select: {
+        occurredAt: true,
+        costAmount: true,
+        costAmountEur: true,
+        costCurrency: true,
+      },
     }),
     prisma.task.findMany({
       where: { status: 'done', completedAt: { gte: fourWeeksAgo, lt: weekStart } },
@@ -122,7 +112,12 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
     }),
     prisma.log.findMany({
       where: { occurredAt: { gte: fourWeeksAgo, lt: weekStart }, costAmount: { not: null } },
-      select: { occurredAt: true, costAmount: true },
+      select: {
+        occurredAt: true,
+        costAmount: true,
+        costAmountEur: true,
+        costCurrency: true,
+      },
     }),
     prisma.task.count({
       where: { status: 'done', completedAt: { gte: weekStart }, goalId: { not: null } },
@@ -156,7 +151,11 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
   for (let i = 0; i < 14; i += 1) spendMap.set(toIsoDay(daysAgo(13 - i)), 0);
   spendLogs14d.forEach((row) => {
     const key = toIsoDay(row.occurredAt);
-    spendMap.set(key, (spendMap.get(key) ?? 0) + (row.costAmount ?? 0));
+    spendMap.set(
+      key,
+      (spendMap.get(key) ?? 0) +
+        effectiveSpendEur(row.costAmount, row.costAmountEur, row.costCurrency),
+    );
   });
 
   const bucketByWeek = (dates: Array<{ completedAt: Date | null }>): Array<number> => {
@@ -187,14 +186,21 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
   };
 
   const bucketSpendByWeek = (
-    rows: Array<{ occurredAt: Date; costAmount: number | null }>,
+    rows: Array<{
+      occurredAt: Date;
+      costAmount: number | null;
+      costAmountEur: number | null;
+      costCurrency: string | null;
+    }>,
   ): Array<number> => {
     const buckets = [0, 0, 0, 0];
     rows.forEach((row) => {
       const diffDays = Math.floor((weekStart.getTime() - row.occurredAt.getTime()) / 86_400_000);
       const weekIndex = Math.floor(diffDays / 7);
       if (weekIndex >= 0 && weekIndex < 4) {
-        buckets[weekIndex] = (buckets[weekIndex] ?? 0) + (row.costAmount ?? 0);
+        buckets[weekIndex] =
+          (buckets[weekIndex] ?? 0) +
+          effectiveSpendEur(row.costAmount, row.costAmountEur, row.costCurrency);
       }
     });
     return buckets.reverse();
@@ -203,7 +209,13 @@ export const buildUrgency = async (): Promise<UrgencyResponse> => {
   const tasksBaseline = rollingWeeklyAverage(bucketByWeek(completions4w));
   const studyValue = studyMinutesAgg._sum.timeSpentMinutes ?? 0;
   const studyBaseline = rollingWeeklyAverage(bucketStudyByWeek(studyWeeks4w));
-  const spendValue = Math.round((spendWeekAgg._sum.costAmount ?? 0) * 100) / 100;
+  const spendValue =
+    Math.round(
+      spendLogsWeek.reduce(
+        (sum, row) => sum + effectiveSpendEur(row.costAmount, row.costAmountEur, row.costCurrency),
+        0,
+      ) * 100,
+    ) / 100;
   const spendBaseline = rollingWeeklyAverage(bucketSpendByWeek(spendWeeks4w));
 
   const goalLinkedBaseline = rollingWeeklyAverage(bucketByWeek(goalLinkedTasks4w));

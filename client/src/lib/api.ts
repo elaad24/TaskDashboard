@@ -663,8 +663,11 @@ export const apiFocus = {
     request('GET', '/api/focus/insights/latest', {
       schema: focusInsightSchema.nullable(),
     }),
-  generateInsight: () =>
-    request('POST', '/api/focus/insights/generate', { schema: focusInsightSchema }),
+  generateInsight: (options?: { force?: boolean }) =>
+    request('POST', '/api/focus/insights/generate', {
+      query: options?.force ? { force: true } : undefined,
+      schema: focusInsightSchema,
+    }),
 };
 
 // Re-export response types for consumer convenience

@@ -46,7 +46,7 @@ export const useCreateFocusSession = () => {
 export const useGenerateFocusInsight = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => apiFocus.generateInsight(),
+    mutationFn: (options?: { force?: boolean }) => apiFocus.generateInsight(options),
     onSuccess: (data) => {
       qc.setQueryData(queryKeys.focusInsight, data);
     },

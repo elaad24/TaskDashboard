@@ -123,6 +123,21 @@ const handleCallback = async (
   const data = callback.data ?? '';
   const client = telegramClient(botToken);
   const chatId = String(callback.message?.chat.id ?? '');
+
+  if (!chatId) {
+    await client.answerCallbackQuery({ callbackQueryId: callback.id });
+    return;
+  }
+
+  const paired = await isPairedChat(chatId);
+  if (!paired) {
+    await client.answerCallbackQuery({
+      callbackQueryId: callback.id,
+      text: 'Chat not paired',
+    });
+    return;
+  }
+
   const [kind, first, second] = data.split(':');
 
   if (kind === 'done' && first) {

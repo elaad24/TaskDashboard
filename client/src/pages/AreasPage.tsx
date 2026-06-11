@@ -29,6 +29,8 @@ export const AreasPage = () => {
   const goals = useGoals(selectedId ? { areaId: selectedId, status: 'active' } : undefined);
   const logs = useLogs(selectedId ? { areaId: selectedId, limit: 20 } : undefined);
 
+  const areaList = areas ?? [];
+
   const blockedCount = useMemo(
     () => tasks.data?.filter((t) => t.status === 'blocked').length ?? 0,
     [tasks.data],
@@ -78,7 +80,7 @@ export const AreasPage = () => {
             />
           ) : (
             <ul className="mt-4 space-y-2">
-              {areas!.map((a) => (
+              {areaList.map((a) => (
                 <li key={a.id}>
                   <button
                     onClick={() => selectArea(a.id)}
@@ -157,11 +159,17 @@ export const AreasPage = () => {
                 <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-200">
                   Active goals
                 </div>
-                {(goals.data?.length ?? 0) === 0 ? (
+                {goals.isLoading ? (
+                  <div className="mt-3 space-y-2">
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : (goals.data?.length ?? 0) === 0 ? (
                   <EmptyState className="mt-3" title="No active goals in this area." />
                 ) : (
                   <ul className="mt-3 space-y-2">
-                    {goals.data!.map((g) => (
+                    {(goals.data ?? []).map((g) => (
                       <li
                         key={g.id}
                         className="rounded-lg border border-border-subtle bg-white/[0.02] p-3"
@@ -180,11 +188,17 @@ export const AreasPage = () => {
                 <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-200">
                   Open tasks
                 </div>
-                {(tasks.data?.length ?? 0) === 0 ? (
+                {tasks.isLoading ? (
+                  <div className="mt-3 space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-8 w-full" />
+                    ))}
+                  </div>
+                ) : (tasks.data?.length ?? 0) === 0 ? (
                   <EmptyState className="mt-3" title="No open tasks here." />
                 ) : (
                   <ul className="mt-3 space-y-1.5">
-                    {tasks.data!.slice(0, 8).map((t) => (
+                    {(tasks.data ?? []).slice(0, 8).map((t) => (
                       <li
                         key={t.id}
                         className="group flex items-center justify-between gap-2 rounded-md px-1 py-1 text-sm transition-colors hover:bg-white/[0.02]"
@@ -209,11 +223,17 @@ export const AreasPage = () => {
                 <div className="text-[10px] uppercase tracking-[0.18em] text-cyan-200">
                   Recent activity
                 </div>
-                {(logs.data?.length ?? 0) === 0 ? (
+                {logs.isLoading ? (
+                  <div className="mt-3 space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <Skeleton key={i} className="h-8 w-full" />
+                    ))}
+                  </div>
+                ) : (logs.data?.length ?? 0) === 0 ? (
                   <EmptyState className="mt-3" title="No logs yet." />
                 ) : (
                   <ul className="mt-3 divide-y divide-border-subtle">
-                    {logs.data!.slice(0, 8).map((l) => (
+                    {(logs.data ?? []).slice(0, 8).map((l) => (
                       <li key={l.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                         <span className="truncate text-text-main">{l.title}</span>
                         <span className="text-[11px] text-text-muted">

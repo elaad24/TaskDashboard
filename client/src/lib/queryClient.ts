@@ -1,6 +1,39 @@
 import { QueryClient } from '@tanstack/react-query';
 import { queryRetryDelay, shouldRetryQuery } from '@/lib/queryRetry';
 
+const BACKUP_RESTORE_QUERY_PREFIXES = [
+  'dashboard',
+  'overview',
+  'areas',
+  'tracks',
+  'goals',
+  'goal',
+  'tasks',
+  'task',
+  'problems',
+  'problem',
+  'logs',
+  'studyTopics',
+  'resources',
+  'settings',
+  'reminders',
+  'integrations',
+  'tracked-tags',
+  'pending-captures',
+  'sidebar-feed',
+  'urgency',
+  'streak',
+  'mission-map',
+  'focus',
+  'search',
+] as const;
+
+export const invalidateAfterBackupRestore = (queryClient: QueryClient): void => {
+  for (const prefix of BACKUP_RESTORE_QUERY_PREFIXES) {
+    void queryClient.invalidateQueries({ queryKey: [prefix] });
+  }
+};
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

@@ -9,6 +9,7 @@ import {
   readActiveFocusSession,
   resumeActiveFocusSession,
   writeActiveFocusSession,
+  FOCUS_SESSION_STORAGE_KEY,
 } from '@/lib/focusTimer';
 import { StopSessionDialog } from '@/components/focus/StopSessionDialog';
 
@@ -32,6 +33,16 @@ export const FocusTimer = () => {
 
   useEffect(() => {
     syncFromStorage();
+  }, [syncFromStorage]);
+
+  useEffect(() => {
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === FOCUS_SESSION_STORAGE_KEY) {
+        syncFromStorage();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
   }, [syncFromStorage]);
 
   useEffect(() => {

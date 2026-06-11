@@ -72,21 +72,26 @@ export const focusSessionSchema = z.object({
 });
 export type FocusSession = z.infer<typeof focusSessionSchema>;
 
-export const createFocusSessionInputSchema = z.object({
-  activityType: focusActivityTypeSchema,
-  activityNote: z.string().max(200).optional(),
-  description: z.string().max(8000).optional(),
-  startedAt: isoDateString,
-  endedAt: isoDateString,
-  durationSeconds: z.number().int().min(1).max(86400),
-  stopReason: z.string().min(1).max(500),
-  linkMode: focusLinkModeSchema.optional().default('none'),
-  studyTopicId: idSchema.optional(),
-  taskId: idSchema.optional(),
-  goalId: idSchema.optional(),
-  areaId: idSchema.optional().nullable(),
-  newTopic: focusNewTopicInputSchema.optional(),
-});
+export const createFocusSessionInputSchema = z
+  .object({
+    activityType: focusActivityTypeSchema,
+    activityNote: z.string().max(200).optional(),
+    description: z.string().max(8000).optional(),
+    startedAt: isoDateString,
+    endedAt: isoDateString,
+    durationSeconds: z.number().int().min(1).max(86400),
+    stopReason: z.string().min(1).max(500),
+    linkMode: focusLinkModeSchema.optional().default('none'),
+    studyTopicId: idSchema.optional(),
+    taskId: idSchema.optional(),
+    goalId: idSchema.optional(),
+    areaId: idSchema.optional().nullable(),
+    newTopic: focusNewTopicInputSchema.optional(),
+  })
+  .refine((data) => new Date(data.endedAt).getTime() >= new Date(data.startedAt).getTime(), {
+    message: 'endedAt must be on or after startedAt',
+    path: ['endedAt'],
+  });
 export type CreateFocusSessionInput = z.infer<typeof createFocusSessionInputSchema>;
 
 export const focusSuggestInputSchema = z.object({

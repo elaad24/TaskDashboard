@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler } from '../middleware/asyncHandler.js';
+import { validate } from '../middleware/validate.js';
 import {
   getAppSettings,
   invalidateSettingsCache,
@@ -56,8 +57,9 @@ settingsRouter.get(
 
 settingsRouter.patch(
   '/',
+  validate(settingsPatchSchema),
   asyncHandler(async (req, res) => {
-    const input = settingsPatchSchema.parse(req.body);
+    const input = req.body as z.infer<typeof settingsPatchSchema>;
     const updates: Record<string, string | number | boolean | null> = {};
     if (input.aiProvider) updates['ai.provider'] = input.aiProvider;
     if (input.openaiModel) updates['ai.openai.model'] = input.openaiModel;

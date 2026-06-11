@@ -39,7 +39,12 @@ searchRouter.get(
           Array<{ totalCost: number | null; totalMinutes: number | bigint | null }>
         >(
           `SELECT
-              SUM(l.costAmount) as totalCost,
+              SUM(
+                COALESCE(
+                  l.costAmountEur,
+                  CASE WHEN UPPER(COALESCE(l.costCurrency, 'EUR')) = 'EUR' THEN l.costAmount ELSE 0 END
+                )
+              ) as totalCost,
               SUM(l.timeSpentMinutes) as totalMinutes
            FROM Log l
            WHERE ${conditions}`,

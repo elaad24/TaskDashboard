@@ -91,7 +91,7 @@ const GoalsList = () => {
         </GlassCard>
       ) : (
         <SortableList
-          items={goals!}
+          items={goals ?? []}
           disabled={reorderGoals.isPending}
           onReorder={(orderedIds) => reorderGoals.mutateAsync({ orderedIds })}
           renderItem={(g) => (
@@ -290,7 +290,7 @@ const GoalDetail = ({ id }: { id: string }) => {
           <EmptyState className="mt-3" title="No tasks yet for this goal." />
         ) : (
           <ul className="mt-3 space-y-1.5">
-            {tasks.data!.map((t) => (
+            {(tasks.data ?? []).map((t) => (
               <li
                 key={t.id}
                 className="flex items-center justify-between gap-2 rounded-md border border-border-subtle bg-white/[0.02] px-3 py-2 text-sm"
@@ -319,7 +319,7 @@ const GoalDetail = ({ id }: { id: string }) => {
           <EmptyState className="mt-3" title="No resources linked to this goal yet." />
         ) : (
           <ul className="mt-3 space-y-1.5">
-            {resources.data!.map((resource) => (
+            {(resources.data ?? []).map((resource) => (
               <li
                 key={resource.id}
                 className="rounded-md border border-border-subtle bg-white/[0.02] px-3 py-2 text-sm"

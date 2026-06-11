@@ -329,12 +329,22 @@ export const AIRecommendationCard = ({
   // Manual edits per item — keyed by item index
   const [itemEdits, setItemEdits] = useState<Map<number, ItemEdit>>(new Map());
 
-  // Reset all local state whenever the AI result changes (re-analyze happened)
+  // Reset local state when the parsed AI payload meaningfully changes
+  const resultFingerprint = useMemo(
+    () =>
+      JSON.stringify({
+        items: result.items,
+        isSimpleTask: result.isSimpleTask,
+        navigatorMessage: result.navigatorMessage ?? null,
+      }),
+    [result.items, result.isSimpleTask, result.navigatorMessage],
+  );
+
   useEffect(() => {
     setSelected(new Set(result.items.map((_, i) => i)));
     setShowEditPanel(false);
     setItemEdits(new Map());
-  }, [result]);
+  }, [resultFingerprint, result.items]);
 
   const hasTaskLikeInput = hasComplexityToggleInput(result.items);
 

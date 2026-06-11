@@ -1,19 +1,9 @@
 import type { OverviewResponse } from '@command-center/shared';
 import { prisma } from '../db.js';
+import { daysAgoLocal, startOfLocalDay, toLocalIsoDay } from '../utils/dates.js';
 
-const startOfDay = (date: Date): Date => {
-  const out = new Date(date);
-  out.setHours(0, 0, 0, 0);
-  return out;
-};
-
-const daysAgo = (days: number): Date => {
-  const out = startOfDay(new Date());
-  out.setDate(out.getDate() - days);
-  return out;
-};
-
-const toIsoDay = (date: Date): string => startOfDay(date).toISOString().slice(0, 10);
+const daysAgo = daysAgoLocal;
+const toIsoDay = toLocalIsoDay;
 
 export const buildOverview = async (): Promise<OverviewResponse> => {
   const now = new Date();

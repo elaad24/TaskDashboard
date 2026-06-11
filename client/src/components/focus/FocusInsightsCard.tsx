@@ -16,12 +16,12 @@ const isToday = (iso: string): boolean => {
 };
 
 export const FocusInsightsCard = () => {
-  const { data: insight, isLoading } = useFocusInsight();
+  const { data: insight, isLoading, isError, refetch } = useFocusInsight();
   const generateInsight = useGenerateFocusInsight();
   const generatedToday = insight ? isToday(insight.generatedAt) : false;
 
   const handleGenerate = () => {
-    generateInsight.mutate();
+    generateInsight.mutate({ force: generatedToday });
   };
 
   return (
@@ -43,13 +43,31 @@ export const FocusInsightsCard = () => {
           variant="ghost"
           leftIcon={<Sparkles size={14} />}
           loading={generateInsight.isPending}
-          disabled={generatedToday && !generateInsight.isPending}
+          disabled={generateInsight.isPending}
           onClick={handleGenerate}
           data-test-id="focus-generate-insight"
         >
-          {generatedToday ? 'Generated today' : 'Generate insights'}
+          {generatedToday ? 'Regenerate insights' : 'Generate insights'}
         </GlowButton>
       </div>
+
+      {(isError || generateInsight.isError) && (
+        <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+          Could not load focus insights.
+          <GlowButton
+            size="sm"
+            variant="ghost"
+            className="ml-2"
+            onClick={() => {
+              void refetch();
+              if (generateInsight.isError) generateInsight.reset();
+            }}
+            data-test-id="focus-insights-retry"
+          >
+            Retry
+          </GlowButton>
+        </div>
+      )}
 
       {isLoading || generateInsight.isPending ? (
         <div className="mt-4 space-y-2">

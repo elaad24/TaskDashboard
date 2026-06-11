@@ -10,6 +10,7 @@ import {
   serializeTask,
 } from '../utils/serialize.js';
 import { effectiveSpendEur } from './currencyService.js';
+import { startOfWeek as startOfWeekLocal } from '../utils/dates.js';
 
 const DEFAULT_CURRENCY = 'EUR';
 const RECENT_LOGS_LIMIT = 8;
@@ -61,12 +62,7 @@ const buildMergedRecentLogs = (
     .slice(0, RECENT_LOGS_LIMIT);
 };
 
-const startOfWeek = (): Date => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - d.getDay());
-  return d;
-};
+const startOfWeek = (): Date => startOfWeekLocal();
 const startOfMonth = (): Date => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);

@@ -1,4 +1,6 @@
-const rateCache = new Map<string, number>();
+const rateCache = new Map<string, { rate: number; expiresAt: number }>();
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 200;
 
 const normalizeCurrency = (currency: string): string => currency.trim().toUpperCase();
 
@@ -10,10 +12,21 @@ const toIsoDate = (dateInput: string): string => {
   return d.toISOString().slice(0, 10);
 };
 
+const pruneRateCache = (): void => {
+  const now = Date.now();
+  for (const [key, entry] of rateCache) {
+    if (entry.expiresAt <= now) rateCache.delete(key);
+  }
+  if (rateCache.size <= MAX_CACHE_ENTRIES) return;
+  const overflow = rateCache.size - MAX_CACHE_ENTRIES;
+  const keys = Array.from(rateCache.keys()).slice(0, overflow);
+  for (const key of keys) rateCache.delete(key);
+};
+
 const fetchEurRate = async (currency: string, isoDate: string): Promise<number> => {
   const cacheKey = `${currency}:${isoDate}`;
   const cached = rateCache.get(cacheKey);
-  if (cached !== undefined) return cached;
+  if (cached && cached.expiresAt > Date.now()) return cached.rate;
 
   const url = `https://api.frankfurter.app/${isoDate}?from=${encodeURIComponent(currency)}&to=EUR`;
   const response = await fetch(url);
@@ -27,7 +40,8 @@ const fetchEurRate = async (currency: string, isoDate: string): Promise<number> 
     throw new Error(`No EUR rate returned for ${currency} on ${isoDate}`);
   }
 
-  rateCache.set(cacheKey, rate);
+  rateCache.set(cacheKey, { rate, expiresAt: Date.now() + CACHE_TTL_MS });
+  pruneRateCache();
   return rate;
 };
 
@@ -48,7 +62,7 @@ export const convertToEur = async (
   return Math.round(amount * rate * 100) / 100;
 };
 
-/** Effective spend in EUR for aggregation (prefers stored conversion, falls back to raw amount). */
+/** Effective spend in EUR for aggregation. Unconverted foreign amounts contribute 0. */
 export const effectiveSpendEur = (
   costAmount: number | null | undefined,
   costAmountEur: number | null | undefined,
@@ -58,5 +72,5 @@ export const effectiveSpendEur = (
   if (costAmountEur != null) return costAmountEur;
   const currency = normalizeCurrency(costCurrency ?? 'EUR');
   if (currency === 'EUR') return costAmount;
-  return costAmount;
+  return 0;
 };

@@ -21,9 +21,13 @@ import { getProvider } from '../ai/index.js';
 import { prisma } from '../db.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { logger } from '../logger.js';
-import { createLog } from './logService.js';
 import { createStudyTopic, getStudyTopic, updateStudyTopic } from './studyService.js';
 import { serializeFocusInsight, serializeFocusSession } from '../utils/serialize.js';
+import {
+  isSameLocalCalendarDay,
+  startOfLocalDay,
+  startOfWeek,
+} from '../utils/dates.js';
 
 const categorizeResponseSchema = z.object({
   category: distractionCategorySchema,
@@ -568,37 +572,29 @@ const resolveLinks = async (
 
 const rangeToStart = (range: FocusRange): Date | null => {
   const now = new Date();
-  const start = new Date(now);
 
   switch (range) {
     case 'today':
-      start.setHours(0, 0, 0, 0);
-      return start;
-    case 'week': {
-      const day = start.getDay();
-      const diff = day === 0 ? 6 : day - 1;
-      start.setDate(start.getDate() - diff);
-      start.setHours(0, 0, 0, 0);
+      return startOfLocalDay(now);
+    case 'week':
+      return startOfWeek(now);
+    case 'month': {
+      const start = startOfLocalDay(now);
+      start.setDate(1);
       return start;
     }
-    case 'month':
-      start.setDate(1);
-      start.setHours(0, 0, 0, 0);
-      return start;
-    case 'year':
+    case 'year': {
+      const start = startOfLocalDay(now);
       start.setMonth(0, 1);
-      start.setHours(0, 0, 0, 0);
       return start;
+    }
     case 'all':
     default:
       return null;
   }
 };
 
-const isSameCalendarDay = (a: Date, b: Date): boolean =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
+const isSameCalendarDay = isSameLocalCalendarDay;
 
 const buildStats = (
   sessions: Array<{ activityType: string; distractionCategory: string; durationSeconds: number }>,
@@ -657,12 +653,18 @@ const buildStats = (
   };
 };
 
-export const listFocusSessions = async (range: FocusRange = 'all'): Promise<Array<FocusSession>> => {
+export const listFocusSessions = async (
+  range: FocusRange = 'all',
+  options?: { limit?: number; offset?: number },
+): Promise<Array<FocusSession>> => {
   const start = rangeToStart(range);
+  const limit = Math.min(Math.max(options?.limit ?? 500, 1), 1000);
+  const offset = Math.max(options?.offset ?? 0, 0);
   const sessions = await prisma.focusSession.findMany({
     where: start ? { startedAt: { gte: start } } : undefined,
     orderBy: { startedAt: 'desc' },
-    take: 500,
+    take: limit,
+    skip: offset,
   });
   return sessions.map(serializeFocusSession);
 };
@@ -671,52 +673,74 @@ export const createFocusSession = async (input: CreateFocusSessionInput): Promis
   const isLearning = isLearningActivityType(input.activityType);
   const description =
     input.description?.trim() || input.activityNote?.trim() || FOCUS_ACTIVITY_LABELS[input.activityType];
-  const timeSpentMinutes = Math.max(1, Math.round(input.durationSeconds / 60));
+
+  const startedAt = new Date(input.startedAt);
+  const endedAt = new Date(input.endedAt);
+  const computedDurationSeconds = Math.max(
+    1,
+    Math.round((endedAt.getTime() - startedAt.getTime()) / 1000),
+  );
+  if (Math.abs(computedDurationSeconds - input.durationSeconds) > 2) {
+    throw new HttpError(
+      400,
+      'DURATION_MISMATCH',
+      'durationSeconds does not match startedAt and endedAt',
+    );
+  }
+  const durationSeconds = computedDurationSeconds;
+  const timeSpentMinutes = Math.round(durationSeconds / 60);
 
   const [distractionCategory, resolved] = await Promise.all([
     categorizeReason(input.stopReason, input.activityType, input.activityNote),
     resolveLinks(input, isLearning, description),
   ]);
 
-  const log = await createLog({
-    title: resolved.logTitle.slice(0, 200),
-    content: description,
-    kind: isLearning ? 'study' : 'note',
-    studyTopicId: resolved.studyTopicId,
-    taskId: resolved.taskId,
-    goalId: resolved.goalId,
-    areaId: resolved.areaId,
-    timeSpentMinutes,
-    occurredAt: input.startedAt,
-  });
+  const session = await prisma.$transaction(async (tx) => {
+    const log = await tx.log.create({
+      data: {
+        title: resolved.logTitle.slice(0, 200),
+        content: description,
+        kind: isLearning ? 'study' : 'note',
+        areaId: resolved.areaId,
+        goalId: resolved.goalId,
+        taskId: resolved.taskId,
+        studyTopicId: resolved.studyTopicId,
+        timeSpentMinutes: timeSpentMinutes > 0 ? timeSpentMinutes : null,
+        occurredAt: startedAt,
+      },
+    });
 
-  if (resolved.studyTopicId) {
-    const topic = await prisma.studyTopic.findUnique({ where: { id: resolved.studyTopicId } });
-    if (topic) {
-      await updateStudyTopic(resolved.studyTopicId, {
-        totalMinutes: topic.totalMinutes + timeSpentMinutes,
-        lastStudiedAt: input.endedAt,
-      });
+    if (resolved.studyTopicId) {
+      const topic = await tx.studyTopic.findUnique({ where: { id: resolved.studyTopicId } });
+      if (topic) {
+        await tx.studyTopic.update({
+          where: { id: resolved.studyTopicId },
+          data: {
+            totalMinutes: topic.totalMinutes + timeSpentMinutes,
+            lastStudiedAt: endedAt,
+          },
+        });
+      }
     }
-  }
 
-  const session = await prisma.focusSession.create({
-    data: {
-      activityType: input.activityType,
-      activityNote: input.activityNote?.trim() || null,
-      description,
-      isLearning,
-      startedAt: new Date(input.startedAt),
-      endedAt: new Date(input.endedAt),
-      durationSeconds: input.durationSeconds,
-      stopReason: input.stopReason.trim(),
-      distractionCategory,
-      logId: log.id,
-      studyTopicId: resolved.studyTopicId,
-      taskId: resolved.taskId,
-      goalId: resolved.goalId,
-      areaId: resolved.areaId,
-    },
+    return tx.focusSession.create({
+      data: {
+        activityType: input.activityType,
+        activityNote: input.activityNote?.trim() || null,
+        description,
+        isLearning,
+        startedAt,
+        endedAt,
+        durationSeconds,
+        stopReason: input.stopReason.trim(),
+        distractionCategory,
+        logId: log.id,
+        studyTopicId: resolved.studyTopicId,
+        taskId: resolved.taskId,
+        goalId: resolved.goalId,
+        areaId: resolved.areaId,
+      },
+    });
   });
 
   return serializeFocusSession(session);
@@ -828,12 +852,18 @@ export const getLatestFocusInsight = async (): Promise<FocusInsight | null> => {
   return latest ? serializeFocusInsight(latest) : null;
 };
 
-export const getOrGenerateFocusInsight = async (): Promise<FocusInsight> => {
+export const getOrGenerateFocusInsight = async (options?: {
+  force?: boolean;
+}): Promise<FocusInsight> => {
   const latest = await getLatestInsightRecord();
   const now = new Date();
 
-  if (latest && isSameCalendarDay(latest.generatedAt, now)) {
+  if (!options?.force && latest && isSameCalendarDay(latest.generatedAt, now)) {
     return serializeFocusInsight(latest);
+  }
+
+  if (options?.force && latest && isSameCalendarDay(latest.generatedAt, now)) {
+    await prisma.focusInsight.delete({ where: { id: latest.id } });
   }
 
   const lastGeneratedAt = latest?.generatedAt ?? new Date(0);

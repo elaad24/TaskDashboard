@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import {
   confirmParseInputSchema,
-  overviewResponseSchema,
   goalBreakdownInputSchema,
   nextActionInputSchema,
+  overviewBriefingInputSchema,
   parseInputSchema,
   solveProblemInputSchema,
+  type ConfirmParseInput,
   type ConfirmParseResponse,
 } from '@command-center/shared';
 import { asyncHandler } from '../middleware/asyncHandler.js';
@@ -41,6 +42,7 @@ aiRouter.post(
   '/confirm',
   validate(confirmParseInputSchema),
   asyncHandler(async (req, res) => {
+    const body = req.body as ConfirmParseInput;
     const out: ConfirmParseResponse = {
       createdTaskIds: [],
       createdGoalIds: [],
@@ -49,39 +51,38 @@ aiRouter.post(
       createdLogIds: [],
     };
 
-    if (req.body.tasks) {
-      for (const t of req.body.tasks) {
+    if (body.tasks) {
+      for (const t of body.tasks) {
         const task = await createTask({ ...t, source: 'ai' });
         out.createdTaskIds.push(task.id);
       }
     }
-    if (req.body.goals) {
-      for (const g of req.body.goals) {
+    if (body.goals) {
+      for (const g of body.goals) {
         const goal = await createGoal(g);
         out.createdGoalIds.push(goal.id);
       }
     }
-    if (req.body.problems) {
-      for (const p of req.body.problems) {
+    if (body.problems) {
+      for (const p of body.problems) {
         const problem = await createProblem(p);
         out.createdProblemIds.push(problem.id);
       }
     }
-    if (req.body.studyTopics) {
-      for (const s of req.body.studyTopics) {
+    if (body.studyTopics) {
+      for (const s of body.studyTopics) {
         const topic = await createStudyTopic(s);
         out.createdStudyTopicIds.push(topic.id);
       }
     }
-    if (req.body.logs) {
-      for (const l of req.body.logs) {
+    if (body.logs) {
+      for (const l of body.logs) {
         const log = await createLog(l);
         out.createdLogIds.push(log.id);
       }
     }
-    if ((req.body as { resources?: Array<unknown> }).resources) {
-      for (const resource of (req.body as { resources: Array<Parameters<typeof createResource>[0]> })
-        .resources) {
+    if (body.resources) {
+      for (const resource of body.resources) {
         await createResource(resource);
       }
     }
@@ -91,10 +92,9 @@ aiRouter.post(
 
 aiRouter.post(
   '/overview-briefing',
+  validate(overviewBriefingInputSchema),
   asyncHandler(async (req, res) => {
-    const body = req.body as { snapshot?: unknown };
-    const snapshot = overviewResponseSchema.parse(body.snapshot);
-    res.json(await generateOverviewBriefing(snapshot));
+    res.json(await generateOverviewBriefing(req.body.snapshot));
   }),
 );
 

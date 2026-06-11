@@ -1,5 +1,11 @@
-import type { BackupImportResponse, BackupPayload } from '@command-center/shared';
+import {
+  BACKUP_VERSION,
+  type BackupImportResponse,
+  type BackupPayload,
+} from '@command-center/shared';
+import type { PrismaClient } from '@prisma/client';
 import { prisma } from '../db.js';
+import { HttpError } from '../middleware/errorHandler.js';
 
 const DATE_FIELDS = new Set([
   'createdAt',
@@ -25,7 +31,37 @@ const DATE_FIELDS = new Set([
   'pairedAt',
   'pairingExpiresAt',
   'analyzedAt',
+  'startedAt',
+  'endedAt',
+  'generatedAt',
 ]);
+
+const emptyImportCounts = (): BackupImportResponse['imported'] => ({
+  areas: 0,
+  tracks: 0,
+  goals: 0,
+  tasks: 0,
+  taskDependencies: 0,
+  taskRecurrences: 0,
+  problems: 0,
+  logs: 0,
+  studyTopics: 0,
+  resources: 0,
+  reminders: 0,
+  trackedTags: 0,
+  pendingCaptures: 0,
+  feedGroups: 0,
+  feedItems: 0,
+  appSettings: 0,
+  telegramSubscribers: 0,
+  telegramInboxItems: 0,
+  focusSessions: 0,
+  focusInsights: 0,
+  integrationTokens: 0,
+  integrationScans: 0,
+  aiThreads: 0,
+  aiMessages: 0,
+});
 
 const serializeRecord = (record: Record<string, unknown>): Record<string, unknown> => {
   const out: Record<string, unknown> = {};
@@ -48,25 +84,6 @@ const deserializeRecord = (record: Record<string, unknown>): Record<string, unkn
     }
   }
   return out;
-};
-
-const upsertMany = async (
-  label: string,
-  rows: Array<Record<string, unknown>> | undefined,
-  upsertFn: (row: Record<string, unknown>) => Promise<unknown>,
-  errors: Array<string>,
-): Promise<number> => {
-  if (!rows?.length) return 0;
-  let count = 0;
-  for (const raw of rows) {
-    try {
-      await upsertFn(deserializeRecord(raw));
-      count += 1;
-    } catch (err) {
-      errors.push(`${label}[${String(raw.id ?? raw.key ?? '?')}]: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  }
-  return count;
 };
 
 type UpsertArgs = {
@@ -96,6 +113,231 @@ const splitRow = (row: Record<string, unknown>, idField: 'id' | 'key') => {
   return { idValue, data };
 };
 
+const upsertManyTx = async (
+  label: string,
+  rows: Array<Record<string, unknown>> | undefined,
+  upsertFn: (row: Record<string, unknown>) => Promise<unknown>,
+): Promise<number> => {
+  if (!rows?.length) return 0;
+  let count = 0;
+  for (const raw of rows) {
+    try {
+      await upsertFn(deserializeRecord(raw));
+      count += 1;
+    } catch (err) {
+      const id = String(raw.id ?? raw.key ?? '?');
+      throw new HttpError(
+        400,
+        'BACKUP_IMPORT_FAILED',
+        `${label}[${id}]: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      );
+    }
+  }
+  return count;
+};
+
+type TxClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+const importPayloadInTransaction = async (
+  tx: TxClient,
+  payload: BackupPayload,
+): Promise<BackupImportResponse['imported']> => {
+  const imported = emptyImportCounts();
+
+  imported.areas = await upsertManyTx('areas', payload.areas, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.area.upsert.bind(tx.area) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.tracks = await upsertManyTx('tracks', payload.tracks, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.track.upsert.bind(tx.track) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.goals = await upsertManyTx('goals', payload.goals, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.goal.upsert.bind(tx.goal) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.problems = await upsertManyTx('problems', payload.problems, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.problem.upsert.bind(tx.problem) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  const templateTasks = payload.tasks?.filter((task) => task.isRecurringTemplate === true) ?? [];
+  const otherTasks = payload.tasks?.filter((task) => task.isRecurringTemplate !== true) ?? [];
+
+  imported.tasks += await upsertManyTx('tasks', templateTasks, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.task.upsert.bind(tx.task) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.taskRecurrences = await upsertManyTx('taskRecurrences', payload.taskRecurrences, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.taskRecurrence.upsert.bind(tx.taskRecurrence) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.tasks += await upsertManyTx('tasks', otherTasks, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.task.upsert.bind(tx.task) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.taskDependencies = await upsertManyTx('taskDependencies', payload.taskDependencies, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.taskDependency.upsert.bind(tx.taskDependency) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.logs = await upsertManyTx('logs', payload.logs, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.log.upsert.bind(tx.log) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.studyTopics = await upsertManyTx('studyTopics', payload.studyTopics, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.studyTopic.upsert.bind(tx.studyTopic) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.resources = await upsertManyTx('resources', payload.resources, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.resource.upsert.bind(tx.resource) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.reminders = await upsertManyTx('reminders', payload.reminders, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.reminder.upsert.bind(tx.reminder) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.trackedTags = await upsertManyTx('trackedTags', payload.trackedTags, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.trackedTag.upsert.bind(tx.trackedTag) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.pendingCaptures = await upsertManyTx('pendingCaptures', payload.pendingCaptures, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.pendingCapture.upsert.bind(tx.pendingCapture) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.feedGroups = await upsertManyTx('feedGroups', payload.feedGroups, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.feedGroup.upsert.bind(tx.feedGroup) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.feedItems = await upsertManyTx('feedItems', payload.feedItems, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.feedItem.upsert.bind(tx.feedItem) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.appSettings = await upsertManyTx('appSettings', payload.appSettings, async (row) => {
+    const { idValue, data } = splitRow(row, 'key');
+    await runUpsert(
+      tx.appSetting.upsert.bind(tx.appSetting) as unknown as UpsertFn,
+      { key: idValue },
+      { key: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.telegramSubscribers = await upsertManyTx('telegramSubscribers', payload.telegramSubscribers, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.telegramSubscriber.upsert.bind(tx.telegramSubscriber) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.telegramInboxItems = await upsertManyTx('telegramInboxItems', payload.telegramInboxItems, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.telegramInboxItem.upsert.bind(tx.telegramInboxItem) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.aiThreads = await upsertManyTx('aiThreads', payload.aiThreads, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.aIThread.upsert.bind(tx.aIThread) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.aiMessages = await upsertManyTx('aiMessages', payload.aiMessages, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(tx.aIMessage.upsert.bind(tx.aIMessage) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
+  });
+
+  imported.integrationTokens = await upsertManyTx('integrationTokens', payload.integrationTokens, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.integrationToken.upsert.bind(tx.integrationToken) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.integrationScans = await upsertManyTx('integrationScans', payload.integrationScans, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.integrationScan.upsert.bind(tx.integrationScan) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.focusSessions = await upsertManyTx('focusSessions', payload.focusSessions, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.focusSession.upsert.bind(tx.focusSession) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  imported.focusInsights = await upsertManyTx('focusInsights', payload.focusInsights, async (row) => {
+    const { idValue, data } = splitRow(row, 'id');
+    await runUpsert(
+      tx.focusInsight.upsert.bind(tx.focusInsight) as unknown as UpsertFn,
+      { id: idValue },
+      { id: idValue, ...data },
+      data,
+    );
+  });
+
+  return imported;
+};
+
 export const exportAllData = async (): Promise<BackupPayload> => {
   const [
     areas,
@@ -116,6 +358,12 @@ export const exportAllData = async (): Promise<BackupPayload> => {
     appSettings,
     telegramSubscribers,
     telegramInboxItems,
+    focusSessions,
+    focusInsights,
+    integrationTokens,
+    integrationScans,
+    aiThreads,
+    aiMessages,
   ] = await Promise.all([
     prisma.area.findMany({ orderBy: { order: 'asc' } }),
     prisma.track.findMany({ orderBy: { createdAt: 'asc' } }),
@@ -135,6 +383,12 @@ export const exportAllData = async (): Promise<BackupPayload> => {
     prisma.appSetting.findMany({ orderBy: { key: 'asc' } }),
     prisma.telegramSubscriber.findMany({ orderBy: { createdAt: 'asc' } }),
     prisma.telegramInboxItem.findMany({ orderBy: { sentAt: 'asc' } }),
+    prisma.focusSession.findMany({ orderBy: { startedAt: 'asc' } }),
+    prisma.focusInsight.findMany({ orderBy: { generatedAt: 'asc' } }),
+    prisma.integrationToken.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.integrationScan.findMany({ orderBy: { processedAt: 'asc' } }),
+    prisma.aIThread.findMany({ orderBy: { createdAt: 'asc' } }),
+    prisma.aIMessage.findMany({ orderBy: { createdAt: 'asc' } }),
   ]);
 
   const mapRows = (rows: Array<Record<string, unknown>>) =>
@@ -142,7 +396,7 @@ export const exportAllData = async (): Promise<BackupPayload> => {
 
   return {
     meta: {
-      version: 1,
+      version: BACKUP_VERSION,
       exportedAt: new Date().toISOString(),
       app: 'command-center',
     },
@@ -164,169 +418,23 @@ export const exportAllData = async (): Promise<BackupPayload> => {
     appSettings: mapRows(appSettings as unknown as Array<Record<string, unknown>>),
     telegramSubscribers: mapRows(telegramSubscribers as unknown as Array<Record<string, unknown>>),
     telegramInboxItems: mapRows(telegramInboxItems as unknown as Array<Record<string, unknown>>),
-  };
+    focusSessions: mapRows(focusSessions as unknown as Array<Record<string, unknown>>),
+    focusInsights: mapRows(focusInsights as unknown as Array<Record<string, unknown>>),
+    integrationTokens: mapRows(integrationTokens as unknown as Array<Record<string, unknown>>),
+    integrationScans: mapRows(integrationScans as unknown as Array<Record<string, unknown>>),
+    aiThreads: mapRows(aiThreads as unknown as Array<Record<string, unknown>>),
+    aiMessages: mapRows(aiMessages as unknown as Array<Record<string, unknown>>),
+  } as BackupPayload;
 };
 
 export const importBackup = async (payload: BackupPayload): Promise<BackupImportResponse> => {
-  const errors: Array<string> = [];
-  const imported = {
-    areas: 0,
-    tracks: 0,
-    goals: 0,
-    tasks: 0,
-    taskDependencies: 0,
-    taskRecurrences: 0,
-    problems: 0,
-    logs: 0,
-    studyTopics: 0,
-    resources: 0,
-    reminders: 0,
-    trackedTags: 0,
-    pendingCaptures: 0,
-    feedGroups: 0,
-    feedItems: 0,
-    appSettings: 0,
-    telegramSubscribers: 0,
-    telegramInboxItems: 0,
-  };
-
-  imported.areas = await upsertMany('areas', payload.areas, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.area.upsert.bind(prisma.area) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.tracks = await upsertMany('tracks', payload.tracks, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.track.upsert.bind(prisma.track) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.goals = await upsertMany('goals', payload.goals, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.goal.upsert.bind(prisma.goal) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.problems = await upsertMany('problems', payload.problems, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.problem.upsert.bind(prisma.problem) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  const templateTasks = payload.tasks?.filter((task) => task.isRecurringTemplate === true) ?? [];
-  const otherTasks = payload.tasks?.filter((task) => task.isRecurringTemplate !== true) ?? [];
-
-  imported.tasks += await upsertMany('tasks', templateTasks, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.task.upsert.bind(prisma.task) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.taskRecurrences = await upsertMany('taskRecurrences', payload.taskRecurrences, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.taskRecurrence.upsert.bind(prisma.taskRecurrence) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.tasks += await upsertMany('tasks', otherTasks, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.task.upsert.bind(prisma.task) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.taskDependencies = await upsertMany('taskDependencies', payload.taskDependencies, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.taskDependency.upsert.bind(prisma.taskDependency) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.logs = await upsertMany('logs', payload.logs, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.log.upsert.bind(prisma.log) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.studyTopics = await upsertMany('studyTopics', payload.studyTopics, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.studyTopic.upsert.bind(prisma.studyTopic) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.resources = await upsertMany('resources', payload.resources, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.resource.upsert.bind(prisma.resource) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.reminders = await upsertMany('reminders', payload.reminders, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.reminder.upsert.bind(prisma.reminder) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.trackedTags = await upsertMany('trackedTags', payload.trackedTags, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.trackedTag.upsert.bind(prisma.trackedTag) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.pendingCaptures = await upsertMany('pendingCaptures', payload.pendingCaptures, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.pendingCapture.upsert.bind(prisma.pendingCapture) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.feedGroups = await upsertMany('feedGroups', payload.feedGroups, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.feedGroup.upsert.bind(prisma.feedGroup) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.feedItems = await upsertMany('feedItems', payload.feedItems, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(prisma.feedItem.upsert.bind(prisma.feedItem) as unknown as UpsertFn, { id: idValue }, { id: idValue, ...data }, data);
-  }, errors);
-
-  imported.appSettings = await upsertMany('appSettings', payload.appSettings, async (row) => {
-    const { idValue, data } = splitRow(row, 'key');
-    await runUpsert(
-      prisma.appSetting.upsert.bind(prisma.appSetting) as unknown as UpsertFn,
-      { key: idValue },
-      { key: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.telegramSubscribers = await upsertMany('telegramSubscribers', payload.telegramSubscribers, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.telegramSubscriber.upsert.bind(prisma.telegramSubscriber) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  imported.telegramInboxItems = await upsertMany('telegramInboxItems', payload.telegramInboxItems, async (row) => {
-    const { idValue, data } = splitRow(row, 'id');
-    await runUpsert(
-      prisma.telegramInboxItem.upsert.bind(prisma.telegramInboxItem) as unknown as UpsertFn,
-      { id: idValue },
-      { id: idValue, ...data },
-      data,
-    );
-  }, errors);
-
-  return { imported, errors };
+  try {
+    const imported = await prisma.$transaction(async (tx) => importPayloadInTransaction(tx, payload));
+    return { imported, errors: [] };
+  } catch (err) {
+    if (err instanceof HttpError) {
+      return { imported: emptyImportCounts(), errors: [err.message] };
+    }
+    throw err;
+  }
 };

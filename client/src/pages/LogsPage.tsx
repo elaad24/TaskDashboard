@@ -84,7 +84,7 @@ export const LogsPage = () => {
           />
         ) : (
           <ul className="divide-y divide-border-subtle">
-            {logs!.map((log) => (
+            {(logs ?? []).map((log) => (
               <li key={log.id} className="flex items-start gap-3 py-2.5">
                 <div className="mt-0.5 text-text-soft">{kindIcon(log.kind)}</div>
                 <div className="min-w-0 flex-1">

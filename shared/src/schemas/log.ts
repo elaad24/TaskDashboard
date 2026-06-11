@@ -21,6 +21,7 @@ export const logSchema = z.object({
 });
 export type Log = z.infer<typeof logSchema>;
 
+/** Logs are create-only; there is no PATCH/update API by design. */
 export const createLogInputSchema = z.object({
   title: z.string().min(1).max(200),
   content: z.string().max(8000).optional(),

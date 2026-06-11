@@ -8,6 +8,7 @@ import {
 import type { FocusRange } from '@command-center/shared';
 import { asyncHandler } from '../middleware/asyncHandler.js';
 import { validate } from '../middleware/validate.js';
+import { aiLimiter } from '../middleware/rateLimit.js';
 import {
   createFocusSession,
   getFocusStats,
@@ -19,10 +20,16 @@ import {
 
 const sessionsQuerySchema = z.object({
   range: focusRangeSchema.optional().default('all'),
+  limit: z.coerce.number().int().min(1).max(1000).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
 });
 
 const statsQuerySchema = z.object({
   range: focusRangeSchema.optional().default('week'),
+});
+
+const generateInsightQuerySchema = z.object({
+  force: z.coerce.boolean().optional().default(false),
 });
 
 export const focusRouter = Router();
@@ -31,13 +38,18 @@ focusRouter.get(
   '/sessions',
   validate(sessionsQuerySchema, 'query'),
   asyncHandler(async (req, res) => {
-    const { range } = req.query as { range: FocusRange };
-    res.json(await listFocusSessions(range));
+    const { range, limit, offset } = req.query as unknown as {
+      range: FocusRange;
+      limit?: number;
+      offset?: number;
+    };
+    res.json(await listFocusSessions(range, { limit, offset }));
   }),
 );
 
 focusRouter.post(
   '/sessions/suggest',
+  aiLimiter,
   validate(focusSuggestInputSchema),
   asyncHandler(async (req, res) => {
     res.json(await suggestFocusLinks(req.body));
@@ -70,7 +82,10 @@ focusRouter.get(
 
 focusRouter.post(
   '/insights/generate',
-  asyncHandler(async (_req, res) => {
-    res.json(await getOrGenerateFocusInsight());
+  aiLimiter,
+  validate(generateInsightQuerySchema, 'query'),
+  asyncHandler(async (req, res) => {
+    const { force } = req.query as { force?: boolean };
+    res.json(await getOrGenerateFocusInsight({ force }));
   }),
 );

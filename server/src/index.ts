@@ -14,8 +14,8 @@ const main = async () => {
   startScheduler();
 
   const app = buildApp();
-  const server = app.listen(env.PORT, () => {
-    logger.info(`Command Center API ready -> http://localhost:${env.PORT}`);
+  const server = app.listen(env.PORT, '127.0.0.1', () => {
+    logger.info(`Command Center API ready -> http://127.0.0.1:${env.PORT} (localhost only)`);
   });
 
   const shutdown = async (signal: string) => {

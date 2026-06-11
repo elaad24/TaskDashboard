@@ -363,7 +363,7 @@ export const TasksPage = () => {
           />
         ) : filter === 'done' ? (
           <ul className="divide-y divide-border-subtle">
-            {tasks.data!.map((t) => (
+            {(tasks.data ?? []).map((t) => (
               <li key={t.id} className="px-3 py-1">
                 {renderTaskRow(t)}
               </li>
@@ -372,7 +372,7 @@ export const TasksPage = () => {
         ) : (
           <div className="p-2">
             <SortableList
-              items={tasks.data!}
+              items={tasks.data ?? []}
               disabled={reorderTasks.isPending}
               onReorder={(orderedIds) => reorderTasks.mutateAsync({ orderedIds })}
               renderItem={(t) => renderTaskRow(t)}

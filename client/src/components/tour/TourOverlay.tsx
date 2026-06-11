@@ -156,10 +156,21 @@ export const TourOverlay = () => {
     let cancelled = false;
     let retries = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let resizeObserver: ResizeObserver | undefined;
 
     const attemptMeasure = (): void => {
       if (cancelled) return;
       const found = measureTarget();
+      if (found && step?.target) {
+        const el = document.querySelector(step.target);
+        if (el instanceof HTMLElement) {
+          resizeObserver?.disconnect();
+          resizeObserver = new ResizeObserver(() => {
+            if (!cancelled) measureTarget();
+          });
+          resizeObserver.observe(el);
+        }
+      }
       if (!found && retries < MEASURE_MAX_RETRIES) {
         retries += 1;
         timer = setTimeout(attemptMeasure, MEASURE_RETRY_MS);
@@ -171,8 +182,9 @@ export const TourOverlay = () => {
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
+      resizeObserver?.disconnect();
     };
-  }, [isRunning, stepIndex, measureTarget]);
+  }, [isRunning, stepIndex, measureTarget, step?.target]);
 
   useEffect(() => {
     if (!isRunning) return;

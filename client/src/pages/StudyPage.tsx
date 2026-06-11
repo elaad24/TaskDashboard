@@ -93,7 +93,7 @@ export const StudyPage = () => {
         </GlassCard>
       ) : (
         <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {topics!.map((t) => (
+          {(topics ?? []).map((t) => (
             <GlassCard
               key={t.id}
               variant={t.confidence === 'low' ? 'amber' : 'default'}

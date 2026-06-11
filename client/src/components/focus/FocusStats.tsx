@@ -17,6 +17,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { GlowButton } from '@/components/ui/GlowButton';
 import { useFocusSessions, useFocusStats } from '@/hooks/useFocus';
 import { formatElapsed } from '@/lib/focusTimer';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -41,8 +42,19 @@ const formatDurationMinutes = (seconds: number): string => {
 export const FocusStats = () => {
   const [range, setRange] = useState<FocusRange>('week');
   const reduceMotion = useReducedMotion();
-  const { data: stats, isLoading: statsLoading } = useFocusStats(range);
-  const { data: sessions, isLoading: sessionsLoading } = useFocusSessions(range);
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isError: statsError,
+    refetch: refetchStats,
+  } = useFocusStats(range);
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    refetch: refetchSessions,
+  } = useFocusSessions(range);
+  const sessionItems = sessions ?? [];
   const chartAnimation = reduceMotion ? 0 : 800;
 
   const distractionChartData =
@@ -61,6 +73,23 @@ export const FocusStats = () => {
 
   return (
     <div className="space-y-4" data-test-id="focus-stats">
+      {(statsError || sessionsError) && (
+        <GlassCard className="border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+          Could not load focus analytics.
+          <GlowButton
+            size="sm"
+            variant="ghost"
+            className="ml-2"
+            onClick={() => {
+              void refetchStats();
+              void refetchSessions();
+            }}
+            data-test-id="focus-stats-retry"
+          >
+            Retry
+          </GlowButton>
+        </GlassCard>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {RANGES.map((r) => (
           <button
@@ -240,7 +269,7 @@ export const FocusStats = () => {
               <Skeleton key={i} className="h-12 w-full" />
             ))}
           </div>
-        ) : (sessions?.length ?? 0) === 0 ? (
+        ) : sessionItems.length === 0 ? (
           <EmptyState
             className="mt-3"
             title="No sessions yet"
@@ -248,7 +277,7 @@ export const FocusStats = () => {
           />
         ) : (
           <ul className="mt-3 divide-y divide-border-subtle">
-            {sessions!.map((session) => (
+            {sessionItems.map((session) => (
               <li key={session.id} className="flex items-start gap-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-text-main">

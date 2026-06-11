@@ -1,10 +1,12 @@
 import { useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Download, Upload } from 'lucide-react';
+import { backupPayloadSchema } from '@command-center/shared';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GlowButton } from '@/components/ui/GlowButton';
 import { useToast } from '@/components/ui/Toast';
 import { apiBackup } from '@/lib/api';
+import { invalidateAfterBackupRestore } from '@/lib/queryClient';
 
 export const BackupSection = () => {
   const toast = useToast();
@@ -14,15 +16,21 @@ export const BackupSection = () => {
   const [exporting, setExporting] = useState(false);
 
   const importMutation = useMutation({
-    mutationFn: (body: unknown) => apiBackup.import(body),
+    mutationFn: (body: unknown) => {
+      const parsed = backupPayloadSchema.safeParse(body);
+      if (!parsed.success) {
+        throw new Error(parsed.error.issues.map((issue) => issue.message).join('; '));
+      }
+      return apiBackup.import(parsed.data);
+    },
     onSuccess: (result) => {
       if (result.errors.length > 0) {
-        toast.showError('Restore completed with errors', result.errors.slice(0, 5).join('\n'));
+        toast.showError('Restore failed', result.errors.slice(0, 5).join('\n'));
       } else {
         const total = Object.values(result.imported).reduce((sum, count) => sum + count, 0);
         toast.showSuccess('Backup restored', `${total} record(s) imported.`);
+        invalidateAfterBackupRestore(queryClient);
       }
-      void queryClient.invalidateQueries();
     },
     onError: (error) => {
       toast.showError('Restore failed', error instanceof Error ? error.message : undefined);
@@ -48,7 +56,15 @@ export const BackupSection = () => {
     try {
       const text = await file.text();
       const parsed = JSON.parse(text) as unknown;
-      importMutation.mutate(parsed);
+      const validated = backupPayloadSchema.safeParse(parsed);
+      if (!validated.success) {
+        toast.showError(
+          'Invalid backup file',
+          validated.error.issues.slice(0, 3).map((issue) => issue.message).join('; '),
+        );
+        return;
+      }
+      importMutation.mutate(validated.data);
     } catch {
       toast.showError('Invalid backup file', 'Could not parse JSON.');
     } finally {
@@ -84,7 +100,8 @@ export const BackupSection = () => {
           <div className="rounded-md border border-border-subtle bg-white/[0.02] p-4">
             <p className="text-sm text-text-main">Export backup</p>
             <p className="mt-1 text-xs text-text-soft">
-              Downloads areas, tasks, goals, logs, settings, and more into one file.
+              Downloads areas, tasks, goals, logs, focus sessions, integrations, settings, and more
+              into one file.
             </p>
             <GlowButton
               size="sm"
@@ -101,7 +118,7 @@ export const BackupSection = () => {
           <div className="rounded-md border border-border-subtle bg-white/[0.02] p-4">
             <p className="text-sm text-text-main">Restore backup</p>
             <p className="mt-1 text-xs text-text-soft">
-              Import a backup file. Existing records with the same ID will be updated.
+              Import a backup file. Existing records with the same ID will be updated atomically.
             </p>
             <input
               ref={fileInputRef}
