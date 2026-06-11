@@ -4,11 +4,26 @@ import { getAppSettings } from '../../services/appSettingsService.js';
 import { prisma } from '../../db.js';
 import { completeTask } from '../../services/taskService.js';
 import { snoozeReminder } from '../../services/reminderService.js';
+import {
+  analyzeAndActOnMessage,
+  isPairedChat,
+  markAnalyzed,
+  upsertInboxItem,
+} from '../../services/telegramAnalysisService.js';
 
 let running = false;
 let stopRequested = false;
 
-const handleMessage = async (botToken: string, message: { text?: string; chat: { id: number }; from?: { username?: string } }) => {
+const handleMessage = async (
+  botToken: string,
+  message: {
+    message_id: number;
+    date?: number;
+    text?: string;
+    chat: { id: number };
+    from?: { username?: string };
+  },
+) => {
   const text = message.text?.trim();
   if (!text) return;
   const client = telegramClient(botToken);
@@ -78,9 +93,27 @@ const handleMessage = async (botToken: string, message: { text?: string; chat: {
   if (text === '/help') {
     await client.sendMessage({
       chatId,
-      text: 'Commands: /today, /next, /help. Use /start <code> to pair.',
+      text: 'Commands: /today, /next, /help. Send any plain text to capture a task or expense.',
     });
+    return;
   }
+
+  const paired = await isPairedChat(chatId);
+  if (!paired) {
+    await client.sendMessage({
+      chatId,
+      text: 'This chat is not paired yet. Generate a pairing code in Settings and send /start <code>.',
+    });
+    return;
+  }
+
+  const sentAt = message.date ? new Date(message.date * 1000) : new Date();
+  const item = await upsertInboxItem(message.message_id, chatId, sentAt);
+  if (item.analyzedAt) return;
+
+  const result = await analyzeAndActOnMessage(text);
+  await markAnalyzed(item.id, result.outcome);
+  await client.sendMessage({ chatId, text: result.reply });
 };
 
 const handleCallback = async (

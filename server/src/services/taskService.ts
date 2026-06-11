@@ -9,6 +9,7 @@ import type {
 import { prisma } from '../db.js';
 import { HttpError } from '../middleware/errorHandler.js';
 import { serializeTask } from '../utils/serialize.js';
+import { convertToEur } from './currencyService.js';
 import { computePriorityScore, importanceToPriority } from '../utils/priority.js';
 import { createReminder } from './reminderService.js';
 import { materializeNextInstance } from './recurrenceService.js';
@@ -228,12 +229,26 @@ export const completeTask = async (id: string, input: CompleteTaskInput): Promis
   const incompletePrereqs = await getIncompletePrerequisites(id);
   const warnings = incompletePrereqs.map((t) => `Prerequisite still open: ${t.title}`);
 
+  const completedAt = new Date();
+  let costAmountEur: number | null = null;
+  if (input.costAmount !== undefined) {
+    try {
+      costAmountEur = await convertToEur(
+        input.costAmount,
+        input.costCurrency ?? existing.costCurrency ?? 'EUR',
+        completedAt.toISOString(),
+      );
+    } catch {
+      costAmountEur = null;
+    }
+  }
+
   const result = await prisma.$transaction(async (tx) => {
     const task = await tx.task.update({
       where: { id },
       data: {
         status: 'done',
-        completedAt: new Date(),
+        completedAt,
         priorityScore: 0,
         ...(input.timeSpentMinutes !== undefined && { actualMinutes: input.timeSpentMinutes }),
         ...(input.costAmount !== undefined && {
@@ -263,7 +278,8 @@ export const completeTask = async (id: string, input: CompleteTaskInput): Promis
         timeSpentMinutes: input.timeSpentMinutes ?? null,
         costAmount: input.costAmount ?? null,
         costCurrency: input.costAmount !== undefined ? input.costCurrency ?? 'EUR' : null,
-        occurredAt: new Date(),
+        costAmountEur,
+        occurredAt: completedAt,
       },
     });
 

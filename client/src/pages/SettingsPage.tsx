@@ -10,6 +10,7 @@ import { useSettings, useSettingsStatus, useUpdateSettings } from '@/hooks/useSe
 import { apiSettings } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
 import { ApiImportSection } from '@/components/settings/ApiImportSection';
+import { BackupSection } from '@/components/settings/BackupSection';
 import { IntegrationsSection } from '@/components/settings/IntegrationsSection';
 import { TrackedTagsSection } from '@/components/settings/TrackedTagsSection';
 import { SidebarFeedSection } from '@/components/settings/SidebarFeedSection';
@@ -285,6 +286,8 @@ export const SettingsPage = () => {
         </GlassCard>
 
         <ApiImportSection />
+
+        <BackupSection />
 
         <IntegrationsSection />
 

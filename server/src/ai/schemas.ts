@@ -47,6 +47,7 @@ export const parseResponseJsonSchema = {
             },
             costAmount: { type: ['number', 'null'] },
             costCurrency: { type: ['string', 'null'] },
+            occurredAt: { type: ['string', 'null'] },
             followUpQuestion: { type: ['string', 'null'] },
             suggestedTasks: {
               type: 'array',
@@ -76,6 +77,7 @@ export const parseResponseJsonSchema = {
             'priority',
             'costAmount',
             'costCurrency',
+            'occurredAt',
             'followUpQuestion',
             'suggestedTasks',
           ],

@@ -12,9 +12,12 @@ import {
   BookMarked,
   Settings as SettingsIcon,
   ChevronRight,
+  Compass,
+  Timer,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useTour } from '@/components/tour/useTour';
 import { NavigatorOrb } from '@/components/command/NavigatorOrb';
 import { SidebarFeedTicker } from '@/components/nav/SidebarFeedTicker';
 import { XpBadge } from '@/components/hud/XpBadge';
@@ -42,6 +45,7 @@ const primaryItems: Array<Item> = [
     matchPaths: ['/work', '/tasks', '/goals', '/study', '/mission-map'],
   },
   { to: '/areas', label: 'Areas', icon: Layers },
+  { to: '/focus', label: 'Focus', icon: Timer },
   { to: '/logs', label: 'Logs', icon: ScrollText },
   { to: '/search', label: 'Search', icon: Search },
 ];
@@ -118,6 +122,7 @@ const NavItem = ({ item }: { item: Item }) => {
 
 export const Sidebar = () => {
   const location = useLocation();
+  const { start: startTour } = useTour();
   const pendingCount = usePendingCapturesCount();
   const moreRouteActive = moreItems.some(
     (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
@@ -208,7 +213,16 @@ export const Sidebar = () => {
       </div>
 
       <div className="border-t border-border-subtle px-5 py-4">
-        <div className="text-[11px] leading-relaxed text-text-muted">
+        <button
+          type="button"
+          onClick={startTour}
+          className="flex w-full items-center gap-2 rounded-lg border border-border-subtle px-3 py-2 text-sm text-text-soft transition-colors hover:border-border-accent hover:bg-cyan/5 hover:text-text-main"
+          data-test-id="sidebar-take-tour"
+        >
+          <Compass size={14} className="text-cyan" />
+          <span className="font-medium">Take a tour</span>
+        </button>
+        <div className="mt-3 text-[11px] leading-relaxed text-text-muted">
           Open the app
           <span className="text-text-soft"> -&gt; </span>
           know what matters now.

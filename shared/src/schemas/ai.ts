@@ -5,7 +5,7 @@ import { createProblemInputSchema } from './problem.js';
 import { createStudyTopicInputSchema } from './study.js';
 import { createLogInputSchema } from './log.js';
 import { createResourceInputSchema } from './resource.js';
-import { idSchema, prioritySchema } from './common.js';
+import { idSchema, isoDateString, prioritySchema } from './common.js';
 
 // ---------------------------------------------------------------------------
 // Brain Dump Parser
@@ -47,6 +47,7 @@ export const parsedItemSchema = z.object({
   priority: prioritySchema.optional(),
   costAmount: z.number().min(0).optional().nullable(),
   costCurrency: z.string().max(8).optional().nullable(),
+  occurredAt: isoDateString.optional().nullable(),
   suggestedTasks: z.array(suggestedTaskSchema).optional(),
   followUpQuestion: z.string().max(500).optional().nullable(),
 });

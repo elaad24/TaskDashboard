@@ -100,7 +100,7 @@ export const CompletionsTrendCard = ({ points, weekTotal, loading }: Completions
                   borderRadius: 8,
                   fontSize: 12,
                 }}
-                formatter={(value: number) => [`${value} tasks`, 'Completed']}
+                formatter={(value) => [`${Number(value ?? 0)} tasks`, 'Completed']}
                 labelFormatter={(label) => String(label)}
               />
               <Bar
@@ -184,7 +184,7 @@ export const SpendTrendCard = ({ points, weekTotal, loading }: SpendTrendCardPro
                   borderRadius: 8,
                   fontSize: 12,
                 }}
-                formatter={(value: number) => [formatCurrency(value), 'Spend']}
+                formatter={(value) => [formatCurrency(Number(value ?? 0)), 'Spend']}
                 labelFormatter={(label) => String(label)}
               />
               <Area

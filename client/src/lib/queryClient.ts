@@ -43,4 +43,7 @@ export const queryKeys = {
   streak: (areaId?: string) => ['streak', areaId ?? 'all'] as const,
   missionMap: (filters?: { areaId?: string; goalId?: string }) =>
     ['mission-map', filters ?? {}] as const,
+  focusSessions: (range?: string) => ['focus', 'sessions', range ?? 'all'] as const,
+  focusStats: (range?: string) => ['focus', 'stats', range ?? 'week'] as const,
+  focusInsight: ['focus', 'insight'] as const,
 };

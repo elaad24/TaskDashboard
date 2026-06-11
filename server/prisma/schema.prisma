@@ -203,6 +203,7 @@ model Log {
   timeSpentMinutes Int?
   costAmount       Float?
   costCurrency     String?
+  costAmountEur    Float?
   occurredAt       DateTime @default(now())
   createdAt        DateTime @default(now())
 
@@ -361,6 +362,19 @@ model TelegramSubscriber {
   updatedAt       DateTime @updatedAt
 }
 
+model TelegramInboxItem {
+  id         String    @id @default(cuid())
+  messageId  Int
+  chatId     String
+  sentAt     DateTime
+  analyzedAt DateTime?
+  outcome    String?   // task_created | expense_logged | unknown | error
+  createdAt  DateTime  @default(now())
+
+  @@unique([messageId, chatId])
+  @@index([analyzedAt])
+}
+
 // -----------------------------------------------------------------------------
 // Google integrations (Gmail + Calendar) — tokens stored locally; protect DB file.
 // -----------------------------------------------------------------------------
@@ -462,4 +476,45 @@ model FeedItem {
   group FeedGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@index([groupId])
+}
+
+// -----------------------------------------------------------------------------
+// Focus Tracker
+// -----------------------------------------------------------------------------
+
+model FocusSession {
+  id                  String   @id @default(cuid())
+  activityType        String   // study | work | exercise | reading | chores | creative | other
+  activityNote        String?
+  description         String?
+  isLearning          Boolean  @default(false)
+  startedAt           DateTime
+  endedAt             DateTime
+  durationSeconds     Int
+  stopReason          String
+  distractionCategory String   // phone_social | physical_need | interruption | boredom_fatigue | task_switch | planned_break | other
+  logId               String?
+  studyTopicId        String?
+  taskId              String?
+  goalId              String?
+  areaId              String?
+  createdAt           DateTime @default(now())
+
+  @@index([startedAt])
+  @@index([distractionCategory])
+  @@index([activityType])
+  @@index([studyTopicId])
+  @@index([logId])
+}
+
+model FocusInsight {
+  id               String   @id @default(cuid())
+  generatedAt      DateTime
+  sessionsAnalyzed Int
+  topDistractions  String   // JSON array
+  advice           String
+  stats            String   // JSON object
+  createdAt        DateTime @default(now())
+
+  @@index([generatedAt])
 }

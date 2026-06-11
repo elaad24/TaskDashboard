@@ -13,6 +13,7 @@ import { OverviewPage } from '@/pages/OverviewPage';
 import { ResourcesPage } from '@/pages/ResourcesPage';
 import { WorkRedirect } from '@/pages/WorkRedirect';
 import { MissionMapPage } from '@/pages/MissionMapPage';
+import { FocusPage } from '@/pages/FocusPage';
 
 const routes: Array<RouteObject> = [
   {
@@ -30,6 +31,7 @@ const routes: Array<RouteObject> = [
       { path: 'mission-map', element: <MissionMapPage /> },
       { path: 'study', element: <StudyPage /> },
       { path: 'logs', element: <LogsPage /> },
+      { path: 'focus', element: <FocusPage /> },
       { path: 'search', element: <SearchPage /> },
       { path: 'resources', element: <ResourcesPage /> },
       { path: 'settings', element: <SettingsPage /> },

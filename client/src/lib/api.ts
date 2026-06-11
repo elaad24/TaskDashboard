@@ -40,6 +40,14 @@ import {
   ingestInputSchema,
   ingestResponseSchema,
   ingestSpecSchema,
+  backupImportResponseSchema,
+  backupPayloadSchema,
+  createFocusSessionInputSchema,
+  focusInsightSchema,
+  focusSessionSchema,
+  focusStatsSchema,
+  focusSuggestInputSchema,
+  focusSuggestResponseSchema,
   parseInputSchema,
   parseResponseSchema,
   problemSchema,
@@ -124,6 +132,13 @@ import {
   completeTaskInputSchema,
   reorderInputSchema,
   type ReorderInput,
+  type CreateFocusSessionInput,
+  type FocusInsight,
+  type FocusRange,
+  type FocusSession,
+  type FocusStats,
+  type FocusSuggestInput,
+  type FocusSuggestResponse,
 } from '@command-center/shared';
 import { z, type ZodSchema } from 'zod';
 
@@ -486,6 +501,33 @@ export const apiIngest = {
   },
 };
 
+export const apiBackup = {
+  downloadExport: async (): Promise<void> => {
+    const url = buildUrl('/api/backup/export');
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new ApiError(res.status, 'HTTP_ERROR', `Export failed: ${res.status}`);
+    }
+    const blob = await res.blob();
+    const disposition = res.headers.get('Content-Disposition') ?? '';
+    const match = disposition.match(/filename="([^"]+)"/);
+    const filename = match?.[1] ?? `command-center-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+  },
+  import: (body: unknown) => {
+    const parsed = backupPayloadSchema.parse(body);
+    return request('POST', '/api/backup/import', {
+      body: parsed,
+      schema: backupImportResponseSchema,
+    });
+  },
+};
+
 export const apiIntegrations = {
   googleAuthUrl: () =>
     request('GET', '/api/integrations/google/auth-url', {
@@ -596,6 +638,33 @@ export const apiReminders = {
   cancel: (id: string) => request('POST', `/api/reminders/${id}/cancel`, { schema: reminderSchema }),
   snooze: (id: string, minutes: number) =>
     request('POST', `/api/reminders/${id}/snooze`, { body: { minutes }, schema: reminderSchema }),
+};
+
+// ---------------------------------------------------------------------------
+// Focus tracker
+// ---------------------------------------------------------------------------
+
+export const apiFocus = {
+  listSessions: (range: FocusRange = 'all') =>
+    request('GET', '/api/focus/sessions', { query: { range }, schema: z.array(focusSessionSchema) }),
+  suggestLinks: (input: FocusSuggestInput) =>
+    request('POST', '/api/focus/sessions/suggest', {
+      body: focusSuggestInputSchema.parse(input),
+      schema: focusSuggestResponseSchema,
+    }),
+  createSession: (input: CreateFocusSessionInput) =>
+    request('POST', '/api/focus/sessions', {
+      body: createFocusSessionInputSchema.parse(input),
+      schema: focusSessionSchema,
+    }),
+  getStats: (range: FocusRange = 'week') =>
+    request('GET', '/api/focus/stats', { query: { range }, schema: focusStatsSchema }),
+  getLatestInsight: () =>
+    request('GET', '/api/focus/insights/latest', {
+      schema: focusInsightSchema.nullable(),
+    }),
+  generateInsight: () =>
+    request('POST', '/api/focus/insights/generate', { schema: focusInsightSchema }),
 };
 
 // Re-export response types for consumer convenience

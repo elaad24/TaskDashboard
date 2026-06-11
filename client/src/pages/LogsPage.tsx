@@ -100,7 +100,18 @@ export const LogsPage = () => {
                       <>
                         <span>·</span>
                         <span className="text-neon">
-                          {formatCurrency(log.costAmount, log.costCurrency)}
+                          {log.costCurrency &&
+                          log.costCurrency.toUpperCase() !== 'EUR' &&
+                          log.costAmountEur != null ? (
+                            <>
+                              {formatCurrency(log.costAmountEur, 'EUR')}
+                              <span className="ml-1 text-text-muted">
+                                (originally {formatCurrency(log.costAmount, log.costCurrency)})
+                              </span>
+                            </>
+                          ) : (
+                            formatCurrency(log.costAmount, log.costCurrency)
+                          )}
                         </span>
                       </>
                     )}

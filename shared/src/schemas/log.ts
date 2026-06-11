@@ -15,6 +15,7 @@ export const logSchema = z.object({
   timeSpentMinutes: z.number().int().nullable(),
   costAmount: z.number().nullable(),
   costCurrency: z.string().nullable(),
+  costAmountEur: z.number().nullable(),
   occurredAt: isoDateString,
   createdAt: isoDateString,
 });

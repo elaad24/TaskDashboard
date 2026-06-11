@@ -8,6 +8,7 @@ export type TelegramUpdate = {
   update_id: number;
   message?: {
     message_id: number;
+    date?: number;
     text?: string;
     from?: { username?: string };
     chat: { id: number };

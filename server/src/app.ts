@@ -32,6 +32,8 @@ import { calendarRouter } from './routes/calendar.js';
 import { sidebarFeedRouter } from './routes/sidebarFeed.js';
 import { urgencyRouter } from './routes/urgency.js';
 import { streakRouter } from './routes/streak.js';
+import { backupRouter } from './routes/backup.js';
+import { focusRouter } from './routes/focus.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,7 +48,7 @@ export const buildApp = () => {
       credentials: true,
     }),
   );
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '10mb' }));
   app.use(
     pinoHttp({
       logger,
@@ -108,6 +110,8 @@ export const buildApp = () => {
   app.use('/api/sidebar-feed', sidebarFeedRouter);
   app.use('/api/urgency', urgencyRouter);
   app.use('/api/streak', streakRouter);
+  app.use('/api/backup', backupRouter);
+  app.use('/api/focus', focusRouter);
 
   // Serve the built client in production from the same Express process.
   if (isProd) {

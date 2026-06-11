@@ -9,6 +9,8 @@ import type {
   Resource as PResource,
   TaskRecurrence as PTaskRecurrence,
   Reminder as PReminder,
+  FocusSession as PFocusSession,
+  FocusInsight as PFocusInsight,
 } from '@prisma/client';
 import type {
   Area,
@@ -22,6 +24,10 @@ import type {
   Track,
   TaskRecurrence,
   Reminder,
+  FocusSession,
+  FocusInsight,
+  FocusStats,
+  FocusInsightTopDistraction,
 } from '@command-center/shared';
 
 const iso = (d: Date | null | undefined): string | null =>
@@ -127,6 +133,7 @@ export const serializeLog = (l: PLog): Log => ({
   timeSpentMinutes: l.timeSpentMinutes,
   costAmount: l.costAmount,
   costCurrency: l.costCurrency,
+  costAmountEur: l.costAmountEur,
   occurredAt: isoRequired(l.occurredAt),
   createdAt: isoRequired(l.createdAt),
 });
@@ -232,4 +239,49 @@ export const serializeReminder = (r: PReminder): Reminder => ({
   lastError: r.lastError,
   createdAt: isoRequired(r.createdAt),
   updatedAt: isoRequired(r.updatedAt),
+});
+
+export const serializeFocusSession = (s: PFocusSession): FocusSession => ({
+  id: s.id,
+  activityType: s.activityType as FocusSession['activityType'],
+  activityNote: s.activityNote,
+  description: s.description,
+  isLearning: s.isLearning,
+  startedAt: isoRequired(s.startedAt),
+  endedAt: isoRequired(s.endedAt),
+  durationSeconds: s.durationSeconds,
+  stopReason: s.stopReason,
+  distractionCategory: s.distractionCategory as FocusSession['distractionCategory'],
+  logId: s.logId,
+  studyTopicId: s.studyTopicId,
+  taskId: s.taskId,
+  goalId: s.goalId,
+  areaId: s.areaId,
+  createdAt: isoRequired(s.createdAt),
+});
+
+const parseJson = <T>(raw: string, fallback: T): T => {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+};
+
+export const serializeFocusInsight = (i: PFocusInsight): FocusInsight => ({
+  id: i.id,
+  generatedAt: isoRequired(i.generatedAt),
+  sessionsAnalyzed: i.sessionsAnalyzed,
+  topDistractions: parseJson<Array<FocusInsightTopDistraction>>(i.topDistractions, []),
+  advice: i.advice,
+  stats: parseJson<FocusStats>(i.stats, {
+    range: 'all',
+    totalSessions: 0,
+    totalDurationSeconds: 0,
+    avgDurationSeconds: 0,
+    byDistraction: [],
+    byActivity: [],
+    topDistractions: [],
+  }),
+  createdAt: isoRequired(i.createdAt),
 });

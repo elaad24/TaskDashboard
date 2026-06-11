@@ -9,6 +9,7 @@ import {
   serializeStudyTopic,
   serializeTask,
 } from '../utils/serialize.js';
+import { effectiveSpendEur } from './currencyService.js';
 
 const DEFAULT_CURRENCY = 'EUR';
 const RECENT_LOGS_LIMIT = 8;
@@ -34,6 +35,7 @@ const syntheticTaskCreatedLog = (task: PTask, areaName: string | null): Dashboar
     timeSpentMinutes: null,
     costAmount: null,
     costCurrency: null,
+    costAmountEur: null,
     occurredAt: at,
     createdAt: at,
     taskTitle: task.title,
@@ -71,6 +73,31 @@ const startOfMonth = (): Date => {
   d.setDate(1);
   return d;
 };
+
+type SpendRow = {
+  areaId: string | null;
+  costAmount: number | null;
+  costAmountEur: number | null;
+  costCurrency: string | null;
+};
+
+const sumSpendEur = (rows: Array<SpendRow>): number =>
+  rows.reduce(
+    (sum, row) =>
+      sum + effectiveSpendEur(row.costAmount, row.costAmountEur, row.costCurrency),
+    0,
+  );
+
+const fetchSpendRows = async (since: Date): Promise<Array<SpendRow>> =>
+  prisma.log.findMany({
+    where: { occurredAt: { gte: since }, costAmount: { not: null } },
+    select: {
+      areaId: true,
+      costAmount: true,
+      costAmountEur: true,
+      costCurrency: true,
+    },
+  });
 
 export const buildDashboard = async (): Promise<DashboardResponse> => {
   const [areas, openTasks, activeGoals, openProblems, recentLogs, studyTopics, recentTasks] =
@@ -131,19 +158,21 @@ export const buildDashboard = async (): Promise<DashboardResponse> => {
     }),
   );
 
-  const monthSpendAgg = await prisma.log.aggregate({
-    where: { occurredAt: { gte: startOfMonth() }, costAmount: { not: null } },
-    _sum: { costAmount: true },
-  });
-  const weekSpendAgg = await prisma.log.aggregate({
-    where: { occurredAt: { gte: startOfWeek() }, costAmount: { not: null } },
-    _sum: { costAmount: true },
-  });
-  const byAreaSpend = await prisma.log.groupBy({
-    by: ['areaId'],
-    where: { occurredAt: { gte: startOfMonth() }, costAmount: { not: null } },
-    _sum: { costAmount: true },
-  });
+  const [monthSpendRows, weekSpendRows] = await Promise.all([
+    fetchSpendRows(startOfMonth()),
+    fetchSpendRows(startOfWeek()),
+  ]);
+  const monthSpend = sumSpendEur(monthSpendRows);
+  const weekSpend = sumSpendEur(weekSpendRows);
+
+  const byAreaTotals = new Map<string | null, number>();
+  for (const row of monthSpendRows) {
+    byAreaTotals.set(
+      row.areaId,
+      (byAreaTotals.get(row.areaId) ?? 0) +
+        effectiveSpendEur(row.costAmount, row.costAmountEur, row.costCurrency),
+    );
+  }
   const areaMap = new Map(areas.map((a) => [a.id, a.name]));
 
   // Mission briefing: pick the highest-priority open task linked to a goal
@@ -201,13 +230,13 @@ export const buildDashboard = async (): Promise<DashboardResponse> => {
     problems: openProblems.map(serializeProblem),
     recentLogs: buildMergedRecentLogs(recentLogs, recentTasks),
     budget: {
-      monthSpend: monthSpendAgg._sum.costAmount ?? 0,
-      weekSpend: weekSpendAgg._sum.costAmount ?? 0,
+      monthSpend,
+      weekSpend,
       currency: DEFAULT_CURRENCY,
-      byArea: byAreaSpend.map((row) => ({
-        areaId: row.areaId,
-        areaName: row.areaId ? (areaMap.get(row.areaId) ?? 'Other') : 'Other',
-        total: row._sum.costAmount ?? 0,
+      byArea: Array.from(byAreaTotals.entries()).map(([areaId, total]) => ({
+        areaId,
+        areaName: areaId ? (areaMap.get(areaId) ?? 'Other') : 'Other',
+        total,
       })),
     },
     study: {

@@ -28,6 +28,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { GlowButton } from '@/components/ui/GlowButton';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 import { useConfirmParse } from '@/hooks/useNavigator';
+import { formatCurrency, formatDate } from '@/lib/format';
 import { useAreas } from '@/hooks/useAreas';
 import { ReanalyzePanel } from '@/components/command/ReanalyzePanel';
 import { TaskComplexityToggle } from '@/components/command/TaskComplexityToggle';
@@ -465,6 +466,7 @@ export const AIRecommendationCard = ({
           content: item.summary ?? undefined,
           kind: 'expense',
           areaId,
+          occurredAt: item.occurredAt ?? undefined,
           costAmount: item.costAmount ?? undefined,
           costCurrency: item.costCurrency ?? 'EUR',
         });
@@ -644,6 +646,17 @@ export const AIRecommendationCard = ({
                         className="text-xs text-text-soft"
                       />
                     </div>
+
+                    {item.kind === 'expense' && (item.costAmount != null || item.occurredAt) && (
+                      <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-text-muted">
+                        {item.costAmount != null && (
+                          <span className="text-neon">
+                            {formatCurrency(item.costAmount, item.costCurrency ?? 'EUR')}
+                          </span>
+                        )}
+                        {item.occurredAt && <span>{formatDate(item.occurredAt)}</span>}
+                      </div>
+                    )}
 
                     {/* Suggested sub-tasks (read-only) */}
                     {item.suggestedTasks && item.suggestedTasks.length > 0 && (

@@ -258,6 +258,8 @@ Primary entry points:
 - **Overview** tab for a quick recap
 - **Recurring tasks** (daily / weekly / monthly / interval)
 - **Smart reminders** with in-app queue + optional Telegram delivery
+- **Telegram inbox capture** — send plain-text messages to your bot; AI classifies them as tasks or expenses (works while the server is offline — messages queue on Telegram and are processed on startup)
+- **Full database backup & restore** — one JSON file export/import from Settings
 - **Resource manager** (`/resources`)
 - **Switchable AI provider** in Settings (OpenAI or local Ollama)
 - **Sidebar feed ticker** — tree-structured quote folders (General, Movies, Naruto, ADHD, etc.), exclude items from rotation, customize in Settings
@@ -267,7 +269,8 @@ Primary entry points:
 
 - **Start here** — short bullet guide for daily use
 - AI provider (OpenAI / Ollama)
-- Telegram pairing and quiet hours
+- Telegram pairing, quiet hours, and free-text capture
+- **Backup & restore** — export/import full database as JSON
 - API import, integrations, tracked tags
 - Sidebar feed editor
 
@@ -276,6 +279,66 @@ Primary entry points:
 - Charts and weekly review UI
 - Manual urgency target overrides in Settings
 - Audio cues for celebrations (hook reserved in `celebrate.ts`)
+
+---
+
+## Backup & restore
+
+Export your entire local database to a single JSON file, or restore from a previous backup.
+
+### What is included
+
+Areas, tracks, goals, tasks, task dependencies, recurrences, problems, logs, study topics, resources, reminders, tracked tags, pending captures, sidebar feed, app settings, Telegram pairing state, and Telegram inbox dedup records.
+
+**Excluded (by design):** Google OAuth tokens (`IntegrationToken`) and ephemeral AI chat threads.
+
+### How to use
+
+1. Open **Settings → Backup & restore**
+2. **Export:** click **Download backup** — saves `command-center-backup-<date>.json`
+3. **Import:** choose a backup file — records are **upserted** by ID (same ID updates in place; new IDs are inserted)
+
+### API
+
+| Method | Path | Purpose |
+| ------ | ---- | ------- |
+| `GET` | `/api/backup/export` | Download full backup JSON |
+| `POST` | `/api/backup/import` | Restore from backup payload |
+
+Import uses dependency order (areas → tracks → goals → …) so foreign keys resolve correctly. Partial failures are reported per record in the response `errors[]` array.
+
+---
+
+## Telegram inbox capture
+
+When Telegram is enabled and your device is paired, you can send **plain-text messages** to the bot — not just slash commands.
+
+### What happens
+
+1. You send a message like `buy groceries` or `spent 20$ on lunch`
+2. The worker classifies it with AI: **task**, **expense**, or **unknown**
+3. **Task** → creates a simple task (`priority: medium`, `source: ai`)
+4. **Expense** → creates a `Log` with `kind: expense`
+5. The bot replies with a confirmation (e.g. `Task added: Buy groceries`)
+
+If AI is unavailable, a regex fallback treats money-like messages as expenses; everything else becomes a task.
+
+### Offline / server-down behavior
+
+Telegram holds unacknowledged bot updates on their servers. When your Command Center server is off, messages still arrive at Telegram. On startup, the worker replays pending updates.
+
+**Dedup:** Only `messageId`, `chatId`, `sentAt`, and analysis status are stored locally (`TelegramInboxItem`). Message text is **not** stored — Telegram remains the source of truth. Already-analyzed messages are skipped so restarts do not create duplicates.
+
+### Commands still available
+
+| Command | Action |
+| ------- | ------ |
+| `/start <code>` | Pair device (code from Settings) |
+| `/today` | Open and due-today task counts |
+| `/next` | Highest-priority next task |
+| `/help` | List commands |
+
+Free-text capture requires a **paired** chat. Unpaired senders get pairing instructions.
 
 ---
 
@@ -289,6 +352,8 @@ Primary entry points:
 | `GET/POST/DELETE` | `/api/tasks/:id/dependencies` | Prerequisite CRUD |
 | `POST` | `/api/tasks/:id/complete` | Returns `{ task, warnings[] }` |
 | `GET/POST/PATCH/DELETE` | `/api/sidebar-feed/*` | Quote ticker groups and items |
+| `GET` | `/api/backup/export` | Full database backup JSON download |
+| `POST` | `/api/backup/import` | Restore database from backup JSON |
 
 ---
 
@@ -298,7 +363,7 @@ Primary entry points:
 
 **`Cannot find module '@command-center/shared'`** -> Run `npm install` at the repo root (workspaces are linked there).
 
-**Database is empty / schema out of date** -> `npm run db:migrate` or `npm run db:reset` to recreate and reseed.
+**Database is empty / schema out of date** -> `npm run db:migrate` or `npm run db:reset` to recreate and reseed. To restore from a saved backup instead, use **Settings → Backup & restore → Choose backup file**.
 
 **Port already in use** -> Change `PORT=4000` in `server/.env` and `VITE_API_BASE_URL` in `client/.env` accordingly.
 

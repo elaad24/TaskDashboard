@@ -36,7 +36,7 @@ Rules:
   - "task": a concrete actionable thing
   - "goal": a long-term outcome the user wants
   - "problem": a blocker, weakness or thing the user struggles with
-  - "expense": a money outflow already happened (set costAmount + currency)
+  - "expense": money already spent (past) — set costAmount + costCurrency + occurredAt; NEVER add suggestedTasks
   - "note": a passing thought / decision worth logging
   - "study_weakness": a learning gap to address
   - "resource": a link / reference / book / video
@@ -51,7 +51,33 @@ Rules:
     2. No preparation, research, planning, or multi-step breakdown is needed.
     3. Examples: "buy eggs", "book a flight", "call the dentist", "pay the electricity bill", "throw out the trash".
   Set isSimpleTask: false for study topics, goals, problems, expenses, notes, decisions, resources, projects, or anything that needs splitting into steps.
-  When isSimpleTask is true: return exactly one item in items, leave suggestedTasks as an empty array ([]), and keep the title short and direct.`;
+  When isSimpleTask is true: return exactly one item in items, leave suggestedTasks as an empty array ([]), and keep the title short and direct.
+
+Expense rules — past vs future:
+When the input mentions money being spent, FIRST decide whether the spending already happened or is upcoming:
+
+PAST expense (money already spent — date is today or earlier, or phrases like "I spent", "I paid", "I bought"):
+  → kind: "expense"
+  → set costAmount, costCurrency, occurredAt (ISO date of the event)
+  → set suggestedTasks: [] — NO breakdown, NO sub-tasks
+  → set isSimpleTask: false (it becomes a log entry, not a task)
+
+FUTURE expense (upcoming payment — date is in the future, or phrases like "I need to pay", "I have to buy", "upcoming", no date given and no past-tense signal):
+  → kind: "task", isSimpleTask: true
+  → title should be the action: "Pay motorcycle test fee", "Buy groceries", etc.
+  → include the amount/date in the summary field if available
+  → set suggestedTasks: []
+
+Expense batch format (multi-line spending dumps):
+- When input starts with "money", "i spent", "spent", or similar spending intent followed by a list of items (newlines or commas), parse each line as a separate past expense item.
+- Each entry follows: <title> - <amount> [<currency>] - <date>
+  Examples:
+    "motorcycle lesson - 59 - 4th june" → kind "expense", title "Motorcycle lesson", costAmount 59, costCurrency "EUR", occurredAt "YYYY-06-04"
+    "eye test - $40 USD - 1st june" → kind "expense", costAmount 40, costCurrency "USD", occurredAt "YYYY-06-01"
+- For "expense", extract occurredAt from any date mention ("4th june", "1st june", "6th june", "2025-03-15") as ISO date (YYYY-MM-DD). Assume the current calendar year when no year is given.
+- If no currency is given, default costCurrency to "EUR".
+- Amounts may be written with or without a currency symbol; strip symbols and parse the numeric value.
+- isSimpleTask must be false when there are expense items.`;
 
 export const NEXT_ACTION_PROMPT = (contextBlock: string, availableMinutes?: number) =>
   `${contextBlock}
