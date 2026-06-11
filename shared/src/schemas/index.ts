@@ -19,3 +19,5 @@ export * from './integrations.js';
 export * from './sidebarFeed.js';
 export * from './urgency.js';
 export * from './streak.js';
+export * from './backup.js';
+export * from './focus.js';
